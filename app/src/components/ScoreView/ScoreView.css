@@ -41,3 +41,15 @@
   color: var(--text);
   margin-bottom: 4px;
 }
+/* Follow-mode results per measure. */
+.score-view rect.follow-mark {
+  stroke: none;
+}
+.score-view rect.follow-mark.ok {
+  fill: var(--ok);
+  fill-opacity: 0.14;
+}
+.score-view rect.follow-mark.err {
+  fill: var(--err);
+  fill-opacity: 0.16;
+}

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import createVerovioModule from 'verovio/wasm'
 import { VerovioToolkit } from 'verovio/esm'
 import type { TimeMapEntry } from 'verovio'
-import { buildPlaybackEvents, measureStarts, scoreDurationMs, staffMapFromMei } from './timemap'
+import { assignMeasures, buildPlaybackEvents, measureStarts, scoreDurationMs, staffMapFromMei } from './timemap'
 
 const FIXTURE = fileURLToPath(new URL('../../../engine/tests/fixtures/minuet-in-g.musicxml', import.meta.url))
 
@@ -36,6 +36,17 @@ describe('buildPlaybackEvents', () => {
   })
 })
 
+describe('assignMeasures', () => {
+  it('puts every note in the last measure that starts at or before it', () => {
+    const measures = [
+      { measureId: 'm1', index: 1, ms: 0 },
+      { measureId: 'm2', index: 2, ms: 1500 }
+    ]
+    const ev = (onsetMs: number) => ({ noteId: String(onsetMs), pitch: 60, onsetMs, durMs: 1, velocity: 80, staff: 1, measure: 0 })
+    expect(assignMeasures([ev(0), ev(1498), ev(1499.5), ev(3000)], measures).map((e) => e.measure)).toEqual([1, 1, 2, 2])
+  })
+})
+
 describe('staffMapFromMei', () => {
   it('assigns notes to the enclosing staff, chords included', () => {
     const mei = `<measure><staff xml:id="s1" n="1"><layer><note xml:id="n1"/><chord><note xml:id="n2"></note></chord></layer></staff>
@@ -62,6 +73,10 @@ describe('Minuet in G fixture through Verovio', () => {
     ])
     expect(events.every((e) => e.staff === 1 || e.staff === 2)).toBe(true)
     expect(measureStarts(timemap)).toHaveLength(32)
+    assignMeasures(events, measureStarts(timemap))
+    // Measure 3 starts at 3 s: E5 (right) and C4 (left).
+    expect(events.filter((e) => e.measure === 3 && e.onsetMs === 3000).map((e) => e.pitch)).toEqual([60, 76])
+    expect(events.at(-1)?.measure).toBe(32)
     // 32 bars of 3/4 at ♩ = 120 → 48 s.
     expect(scoreDurationMs(events)).toBe(48_000)
   }, 30_000)

@@ -1,6 +1,7 @@
 import { inTauri, ipc } from './ipc'
 import { scoreDurationMs } from './timemap'
 import { loadScore } from './verovio'
+import { useMidi } from '../stores/midi'
 import { useScore } from '../stores/score'
 import { useTransport } from '../stores/transport'
 
@@ -23,6 +24,7 @@ async function openMusicXml(fileName: string, musicxml: string, title: string | 
 
   const transport = useTransport.getState()
   transport.set({ playing: false, positionMs: 0, currentNoteIds: [], loop: null, pendingLoopStart: null })
+  useMidi.getState().set({ following: false, expectedPitches: [], results: {} })
   if (!inTauri) {
     transport.set({ info: { durationMs: scoreDurationMs(events), synth: 'none', soundfontName: null } })
     return

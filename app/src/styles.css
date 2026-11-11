@@ -8,6 +8,8 @@
   --border: #cfcdc7;
   --accent: #3a64d8;
   --cursor: #e0a800;
+  --ok: #2e9b57;
+  --err: #d23c2f;
   --danger-bg: #fbe3e1;
   --danger: #a3261b;
   color-scheme: light dark;
@@ -24,6 +26,8 @@
     --text-secondary: #a3a29d;
     --border: #3b3b40;
     --accent: #6a8cff;
+    --ok: #3fb56c;
+    --err: #ef5a4c;
     --danger-bg: #4a1f1b;
     --danger: #ffb4ab;
   }

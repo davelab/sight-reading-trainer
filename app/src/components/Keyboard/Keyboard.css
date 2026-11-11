@@ -28,3 +28,13 @@
 .key.played {
   background: var(--accent);
 }
+.key {
+  cursor: pointer;
+  touch-action: none;
+}
+.key.right {
+  background: var(--ok);
+}
+.key.wrong {
+  background: var(--err);
+}

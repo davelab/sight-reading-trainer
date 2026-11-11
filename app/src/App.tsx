@@ -2,12 +2,15 @@ import { useEffect, useRef } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { AnalysisPanel } from './components/AnalysisPanel'
 import { Keyboard } from './components/Keyboard'
+import { MidiPanel } from './components/MidiPanel'
 import { ScoreView } from './components/ScoreView'
 import { Transport } from './components/Transport'
 import { useFileDrop } from './hooks/useFileDrop'
+import { useMidiEvents } from './hooks/useMidiEvents'
 import { usePlaybackPosition } from './hooks/usePlaybackPosition'
 import { inTauri, ipc } from './lib/ipc'
 import { SCORE_EXTENSIONS, openScoreFile, openScorePath } from './lib/loadScore'
+import { useMidi } from './stores/midi'
 import { useScore } from './stores/score'
 import { useTransport } from './stores/transport'
 
@@ -17,6 +20,7 @@ let initialFileRequested = false
 
 export default function App() {
   usePlaybackPosition()
+  useMidiEvents()
   const dropping = useFileDrop()
   const fileInput = useRef<HTMLInputElement>(null)
   const { title, loading, error, zoom, layout, set } = useScore()
@@ -36,6 +40,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || !inTauri || !useScore.getState().events.length) return
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement) return
+      if (e.target instanceof HTMLSelectElement || useMidi.getState().following) return
       e.preventDefault()
       void (useTransport.getState().playing ? ipc.pause() : ipc.play())
     }
@@ -67,6 +72,7 @@ export default function App() {
             e.target.value = ''
           }}
         />
+        <MidiPanel />
         <h1 className="title">{loading ? 'Caricamento…' : (title ?? 'Score Studio')}</h1>
         <div className="toolbar-group">
           <button disabled={!hasScore || zoom <= ZOOM_MIN} onClick={() => set({ zoom: zoom - 5 })} title="Riduci">

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { inTauri, ipc } from '../../lib/ipc'
-import { followCursor, highlightNotes } from '../../lib/overlay'
+import { followCursor, highlightNotes, markMeasures } from '../../lib/overlay'
 import { renderPages, timeForNote } from '../../lib/verovio'
+import { useMidi } from '../../stores/midi'
 import { useScore } from '../../stores/score'
 import { useTransport } from '../../stores/transport'
 import './ScoreView.css'
@@ -15,6 +16,9 @@ export function ScoreView() {
   const layout = useScore((s) => s.layout)
   const currentNoteIds = useTransport((s) => s.currentNoteIds)
   const playing = useTransport((s) => s.playing)
+  const following = useMidi((s) => s.following)
+  const results = useMidi((s) => s.results)
+  const measures = useScore((s) => s.measures)
   const [width, setWidth] = useState(0)
   const [pages, setPages] = useState<string[]>([])
 
@@ -58,8 +62,21 @@ export function ScoreView() {
     const el = containerRef.current
     if (!el) return
     highlighted.current = highlightNotes(el, highlighted.current, currentNoteIds)
-    if (playing) followCursor(el, currentNoteIds[0])
-  }, [currentNoteIds, playing])
+    if (playing || following) followCursor(el, currentNoteIds[0])
+  }, [currentNoteIds, playing, following])
+
+  // Follow-mode results: green measures without mistakes, red with.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const marks = Object.values(results).flatMap((r) => {
+      const m = measures[r.measure - 1]
+      if (!m) return []
+      const status = r.wrong === 0 ? ('ok' as const) : ('err' as const)
+      return [{ measureId: m.measureId, status, title: `Battuta ${r.measure}: ${r.correct} giuste, ${r.wrong} sbagliate` }]
+    })
+    markMeasures(el, marks)
+  }, [results, measures, pages])
 
   const onClick = async (e: React.MouseEvent) => {
     const note = (e.target as Element).closest('g.note')

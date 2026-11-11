@@ -15,6 +15,8 @@ export interface PlaybackEvent {
   velocity: number
   /** 1-based staff number: 1 = right hand, 2 = left hand on a piano grand staff. */
   staff: number
+  /** 1-based measure index in performance order (0 if unknown). */
+  measure: number
 }
 
 export interface NoteInfo {
@@ -41,7 +43,7 @@ export function buildPlaybackEvents(
       const info = lookup(noteId)
       // Tied continuations and grace notes without MIDI duration are not re-triggered.
       if (!info || info.durMs <= 0 || info.pitch < 0 || info.pitch > 127) continue
-      events.push({ noteId, pitch: info.pitch, onsetMs: entry.tstamp, durMs: info.durMs, velocity, staff: info.staff })
+      events.push({ noteId, pitch: info.pitch, onsetMs: entry.tstamp, durMs: info.durMs, velocity, staff: info.staff, measure: 0 })
     }
   }
   events.sort((a, b) => a.onsetMs - b.onsetMs || a.pitch - b.pitch)
@@ -81,6 +83,22 @@ export function measureStarts(timemap: TimeMapEntry[]): MeasureStart[] {
     if (entry.measureOn) out.push({ measureId: entry.measureOn, index: out.length + 1, ms: entry.tstamp })
   }
   return out
+}
+
+/** Fill `measure` on every event from the measure start times (in place). */
+export function assignMeasures(events: PlaybackEvent[], measures: MeasureStart[]): PlaybackEvent[] {
+  for (const e of events) {
+    // Last measure starting at or before the onset (1 ms slack for float rounding).
+    let lo = 0
+    let hi = measures.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (measures[mid].ms <= e.onsetMs + 1) lo = mid + 1
+      else hi = mid
+    }
+    e.measure = lo > 0 ? measures[lo - 1].index : 0
+  }
+  return events
 }
 
 export function scoreDurationMs(events: PlaybackEvent[]): number {

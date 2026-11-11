@@ -4,7 +4,7 @@
  */
 import createVerovioModule from 'verovio/wasm'
 import { VerovioToolkit } from 'verovio/esm'
-import { buildPlaybackEvents, measureStarts, staffMapFromMei, type MeasureStart, type PlaybackEvent } from './timemap'
+import { assignMeasures, buildPlaybackEvents, measureStarts, staffMapFromMei, type MeasureStart, type PlaybackEvent } from './timemap'
 
 let toolkitPromise: Promise<VerovioToolkit> | null = null
 
@@ -38,7 +38,8 @@ export async function loadScore(musicxml: string): Promise<LoadedScore> {
     if (!midi || typeof midi.pitch !== 'number') return null
     return { pitch: midi.pitch, durMs: midi.duration, staff: staffs.get(id) ?? 1 }
   })
-  return { events, measures: measureStarts(timemap) }
+  const measures = measureStarts(timemap)
+  return { events: assignMeasures(events, measures), measures }
 }
 
 /** Lay the loaded score out at the given width and return one SVG string per page. */
