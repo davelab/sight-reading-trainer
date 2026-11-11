@@ -7,7 +7,9 @@ sincronizzato, modalità "segui" via MIDI, analisi armonica e pattern ripetuti.
 - Specifica completa: [`docs/SPEC.md`](docs/SPEC.md)
 - Istruzioni per Claude Code: [`CLAUDE.md`](CLAUDE.md)
 
-## Stato: milestone M1 — partitura e playback
+## Stato: milestone M2 — MIDI e modalità segui
+
+### M1 — partitura e playback
 
 | Fatto | Dove |
 |---|---|
@@ -20,8 +22,26 @@ sincronizzato, modalità "segui" via MIDI, analisi armonica e pattern ripetuti.
 | `playback:position` a ~60 Hz, note correnti evidenziate in giallo + tastiera | `src-tauri/src/lib.rs`, `lib/overlay.ts`, `components/Keyboard` |
 | Sidecar JSON-RPC: `ping`, `score.normalize`; schema pydantic → JSON Schema → TS | `engine/`, `scripts/gen-types.sh` |
 
-Prossime: M2 (MIDI e modalità segui), M3 (analisi armonica), M4 (pattern),
-M5 (OMR), M6 (packaging). Vedi la roadmap in `docs/SPEC.md`.
+### M2 — MIDI e modalità segui
+
+| Fatto | Dove |
+|---|---|
+| Ingresso MIDI con midir: elenco dispositivi (aggiornato ogni 3 s), selezione, note on/off | `src-tauri/src/midi.rs`, `components/MidiPanel` |
+| Modalità «Segui»: il cursore aspetta ogni accordo finché tutte le sue note sono suonate | `src-tauri/src/follow.rs` |
+| Rispetta mani (solo destra/sinistra) e loop A–B; ▶ esce dalla modalità e riparte da lì | `follow.rs`, `commands.rs` |
+| Esito per battuta (`follow:result {measure, correct, wrong}`): battute verdi o rosse, riepilogo in alto | `lib/overlay.ts`, `stores/midi.ts` |
+| Tastiera a schermo: note attese (giallo), suonate (blu), giuste/sbagliate (verde/rosso) | `components/Keyboard` |
+| Tastiera cliccabile: suona col synth e alimenta la modalità segui come un piano MIDI | comando `virtual_note` |
+
+Estensioni al contratto IPC della specifica: `playback:position` porta anche
+`following` ed `expectedPitches`; nuovo comando `virtual_note {pitch, on}`;
+`set_follow_mode {enabled}` restituisce se la modalità è attiva;
+`midi_list_devices` restituisce `{devices, selected}`; ogni evento di playback
+porta il numero di `measure`. Le note del piano MIDI non passano dal synth (il
+piano suona già da sé).
+
+Prossime: M3 (analisi armonica), M4 (pattern), M5 (OMR), M6 (packaging).
+Vedi la roadmap in `docs/SPEC.md`.
 
 ## Requisiti
 
@@ -80,6 +100,31 @@ battute in 3/4, ♩ = 120, pubblico dominio.
 Il passo 3 è stato verificato anche in automatico su Linux (Xvfb, senza audio):
 dopo 3 s di playback le note evidenziate sono mi⁵ e do⁴, inizio battuta 3.
 
+## Test end-to-end manuale (criterio di uscita M2)
+
+«Col piano collegato il cursore avanza solo sulle note corrette.»
+
+1. Collega il piano digitale via USB o Bluetooth MIDI (per il Bluetooth:
+   Configurazione MIDI Audio → Finestra MIDI Studio → Bluetooth) e avvia l'app.
+2. Entro 3 s il piano compare nel menu accanto ad «Apri…»: selezionalo.
+   Suonando, i tasti premuti si colorano di blu sulla tastiera a schermo.
+3. Apri il Minuetto e premi «Segui». Il cursore si ferma su re⁵ + sol³.
+4. Suona solo re⁵: il cursore non si muove (manca sol³). Aggiungi sol³: passa a sol⁴.
+5. Suona una nota sbagliata: il tasto diventa rosso, il cursore resta fermo.
+6. Completa la battuta 1: la battuta si colora di rosso (c'era un errore);
+   suona la battuta 2 senza errori: si colora di verde. In alto compare
+   «giuste · sbagliate · %».
+7. «Destra»: il cursore aspetta solo la mano destra. Con un loop A–B attivo,
+   alla fine del loop il cursore torna ad A.
+8. ▶ esce dalla modalità segui e suona dal punto raggiunto.
+9. Scollega il piano: entro 3 s sparisce dal menu.
+
+Senza piano, i passi 3–8 si provano cliccando la tastiera a schermo. Questa
+variante è stata eseguita in automatico su Linux (Xvfb + xdotool): battuta 1
+rossa con 1 errore, battuta 2 verde, cursore fermo su mi⁵ + do⁴ della battuta
+3, «11 giuste · 1 sbagliate · 92%». Il percorso midir con un piano vero va
+verificato sul Mac (nel container non c'è un sequencer MIDI).
+
 ## Note di architettura
 
 - Il tempo reale vive solo in Rust. Lo scheduler gira dentro la callback
@@ -89,3 +134,7 @@ dopo 3 s di playback le note evidenziate sono mi⁵ e do⁴, inizio battuta 3.
 - Le posizioni sono in millisecondi di partitura (tempo al 100 %); il tempo
   scala solo l'avanzamento, quindi cambiarlo non richiede di rinviare gli eventi.
 - Le annotazioni future si agganciano a (battuta, tempo), mai agli ID delle note.
+- La modalità segui è una macchina a stati pura (`follow.rs`): gli accordi sono
+  le note con onset entro 15 ms; una nota già suonata nell'accordo e ripetuta
+  non conta né giusta né sbagliata. Mentre segue, il clock è fermo e il
+  trasporto viene spostato sull'accordo atteso, così cursore e ▶ restano coerenti.
