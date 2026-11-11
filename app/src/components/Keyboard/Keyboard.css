@@ -1,0 +1,30 @@
+.keyboard {
+  position: relative;
+  height: 64px;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+}
+.key {
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+}
+.key.white {
+  height: 100%;
+  background: #fbfbfa;
+  border: 1px solid #b9b9b4;
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+}
+.key.black {
+  height: 60%;
+  background: #222;
+  border-radius: 0 0 2px 2px;
+  z-index: 1;
+}
+.key.expected {
+  background: var(--cursor);
+}
+.key.played {
+  background: var(--accent);
+}

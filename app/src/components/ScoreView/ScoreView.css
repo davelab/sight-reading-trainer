@@ -1,0 +1,43 @@
+.score-view {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  background: var(--paper-bg);
+}
+.score-page {
+  margin: 0 auto;
+  width: fit-content;
+  background: var(--paper);
+  color: #111;
+}
+.score-page svg {
+  display: block;
+}
+.layout-pages .score-page {
+  margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+  border-radius: 2px;
+}
+.score-view g.note {
+  cursor: pointer;
+}
+/* Playback cursor: notes currently sounding. */
+.score-view g.note.playing,
+.score-view g.note.playing * {
+  fill: var(--cursor) !important;
+  stroke: var(--cursor) !important;
+}
+.score-empty {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: var(--text-secondary);
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+}
+.score-empty-title {
+  font-size: 1.25rem;
+  color: var(--text);
+  margin-bottom: 4px;
+}

@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "Chord": {
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "beat": {
+          "description": "1-based beat within the measure",
+          "minimum": 1,
+          "type": "number"
+        },
+        "symbol": {
+          "description": "Chord symbol, e.g. 'D7'",
+          "type": "string"
+        },
+        "roman": {
+          "description": "Roman numeral in the local key, e.g. 'V7'",
+          "type": "string"
+        },
+        "function": {
+          "enum": [
+            "tonic",
+            "predominant",
+            "dominant",
+            "other"
+          ],
+          "type": "string"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "measure",
+        "beat",
+        "symbol",
+        "roman",
+        "function"
+      ],
+      "title": "Chord",
+      "type": "object"
+    },
+    "KeyRegion": {
+      "additionalProperties": false,
+      "properties": {
+        "fromMeasure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "toMeasure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "tonic": {
+          "description": "Pitch class name, e.g. 'G', 'F#', 'Bb'",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "major",
+            "minor"
+          ],
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "fromMeasure",
+        "toMeasure",
+        "tonic",
+        "mode",
+        "confidence"
+      ],
+      "title": "KeyRegion",
+      "type": "object"
+    },
+    "Pattern": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "exact",
+            "transposed",
+            "variant"
+          ],
+          "type": "string"
+        },
+        "length": {
+          "description": "Length in measures",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "occurrences": {
+          "description": "Starting measure of every occurrence",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Transposition interval for kind='transposed', e.g. 'P4'"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "length",
+        "occurrences"
+      ],
+      "title": "Pattern",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "fromMeasure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "toMeasure": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "label",
+        "fromMeasure",
+        "toMeasure"
+      ],
+      "title": "Section",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of the ``analyze`` JSON-RPC method.",
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "default": 1,
+      "type": "integer"
+    },
+    "key": {
+      "items": {
+        "$ref": "#/$defs/KeyRegion"
+      },
+      "type": "array"
+    },
+    "chords": {
+      "items": {
+        "$ref": "#/$defs/Chord"
+      },
+      "type": "array"
+    },
+    "patterns": {
+      "items": {
+        "$ref": "#/$defs/Pattern"
+      },
+      "type": "array"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/Section"
+      },
+      "type": "array"
+    }
+  },
+  "title": "Analysis",
+  "type": "object"
+}

@@ -1,0 +1,88 @@
+/**
+ * Verovio timemap → playback events for the Rust scheduler.
+ *
+ * Pure functions, no Verovio import: the toolkit is injected through
+ * `NoteLookup`, so this module is testable in Node.
+ */
+import type { TimeMapEntry } from 'verovio'
+
+/** One note to play. Times are in score milliseconds (at 100% tempo). */
+export interface PlaybackEvent {
+  noteId: string
+  pitch: number
+  onsetMs: number
+  durMs: number
+  velocity: number
+  /** 1-based staff number: 1 = right hand, 2 = left hand on a piano grand staff. */
+  staff: number
+}
+
+export interface NoteInfo {
+  pitch: number
+  durMs: number
+  staff: number
+}
+
+export type NoteLookup = (noteId: string) => NoteInfo | null
+
+export const DEFAULT_VELOCITY = 80
+
+export function buildPlaybackEvents(
+  timemap: TimeMapEntry[],
+  lookup: NoteLookup,
+  velocity = DEFAULT_VELOCITY
+): PlaybackEvent[] {
+  const events: PlaybackEvent[] = []
+  const seen = new Set<string>()
+  for (const entry of timemap) {
+    for (const noteId of entry.on ?? []) {
+      if (seen.has(noteId)) continue
+      seen.add(noteId)
+      const info = lookup(noteId)
+      // Tied continuations and grace notes without MIDI duration are not re-triggered.
+      if (!info || info.durMs <= 0 || info.pitch < 0 || info.pitch > 127) continue
+      events.push({ noteId, pitch: info.pitch, onsetMs: entry.tstamp, durMs: info.durMs, velocity, staff: info.staff })
+    }
+  }
+  events.sort((a, b) => a.onsetMs - b.onsetMs || a.pitch - b.pitch)
+  return events
+}
+
+/**
+ * Map every note xml:id to its staff number by scanning Verovio's MEI output.
+ * MEI <staff> elements never nest, so a flat tag scan is enough and avoids a DOM.
+ */
+export function staffMapFromMei(mei: string): Map<string, number> {
+  const map = new Map<string, number>()
+  const tag = /<(\/?)(staff|note)\b([^>]*)>/g
+  let staff = 0
+  for (let m = tag.exec(mei); m; m = tag.exec(mei)) {
+    const [, closing, name, attrs] = m
+    if (name === 'staff') {
+      staff = closing ? 0 : Number(/\bn="(\d+)"/.exec(attrs)?.[1] ?? 0)
+    } else if (!closing && staff > 0) {
+      const id = /\bxml:id="([^"]+)"/.exec(attrs)?.[1]
+      if (id) map.set(id, staff)
+    }
+  }
+  return map
+}
+
+export interface MeasureStart {
+  measureId: string
+  /** 1-based index in performance order. */
+  index: number
+  ms: number
+}
+
+export function measureStarts(timemap: TimeMapEntry[]): MeasureStart[] {
+  const out: MeasureStart[] = []
+  for (const entry of timemap) {
+    if (entry.measureOn) out.push({ measureId: entry.measureOn, index: out.length + 1, ms: entry.tstamp })
+  }
+  return out
+}
+
+export function scoreDurationMs(events: PlaybackEvent[]): number {
+  return events.reduce((max, e) => Math.max(max, e.onsetMs + e.durMs), 0)
+}
