@@ -24,6 +24,9 @@ pub struct PlaybackEvent {
     pub velocity: u8,
     /// 1-based staff: 1 = right hand, 2 = left hand on a piano grand staff.
     pub staff: u8,
+    /// 1-based measure index in performance order (0 when unknown).
+    #[serde(default)]
+    pub measure: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
@@ -36,7 +39,7 @@ pub enum Hands {
 }
 
 impl Hands {
-    fn plays(self, staff: u8) -> bool {
+    pub fn plays(self, staff: u8) -> bool {
         match self {
             Hands::Both => true,
             Hands::Right => staff <= 1,
@@ -274,7 +277,7 @@ mod tests {
     use MidiAction::*;
 
     fn ev(id: &str, pitch: u8, onset: f64, dur: f64, staff: u8) -> PlaybackEvent {
-        PlaybackEvent { note_id: id.into(), pitch, onset_ms: onset, dur_ms: dur, velocity: 80, staff }
+        PlaybackEvent { note_id: id.into(), pitch, onset_ms: onset, dur_ms: dur, velocity: 80, staff, measure: 1 }
     }
 
     /// Two beats at 120 bpm: right hand D5 then G4; left hand G3 held for both.

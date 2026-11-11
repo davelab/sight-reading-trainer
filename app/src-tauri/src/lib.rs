@@ -24,9 +24,14 @@ struct PositionEvent {
     note_ids: Vec<String>,
     ms: f64,
     playing: bool,
+    /// Follow mode is on: `noteIds` are the notes the player must play now.
+    following: bool,
+    /// Pitches of the current chord not played yet (follow mode only).
+    expected_pitches: Vec<u8>,
 }
 
-/// Emit `playback:position` ~60 times a second while playing, and once on every change.
+/// Emit `playback:position` ~60 times a second while it changes (playing, or
+/// follow mode moving on), and never while nothing changes.
 fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
     thread::Builder::new()
         .name("position".into())
@@ -35,10 +40,19 @@ fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
             loop {
                 thread::sleep(POSITION_INTERVAL);
                 let event = match engine.lock() {
+                    Ok(e) if e.follow.is_active() => PositionEvent {
+                        note_ids: e.follow.expected_note_ids(),
+                        ms: e.transport.position_ms(),
+                        playing: false,
+                        following: true,
+                        expected_pitches: e.follow.expected_pitches(),
+                    },
                     Ok(e) => PositionEvent {
                         note_ids: e.transport.current_note_ids(),
                         ms: e.transport.position_ms(),
                         playing: e.transport.is_playing(),
+                        following: false,
+                        expected_pitches: Vec::new(),
                     },
                     Err(_) => return,
                 };
@@ -65,7 +79,7 @@ pub fn run() {
             let soundfont = synth::find_soundfont(&dirs);
             let (engine, status) = synth::start(soundfont);
             spawn_position_emitter(app.handle().clone(), engine.clone());
-            app.manage(AppState { engine, synth: status.kind, soundfont: status.soundfont });
+            app.manage(AppState { engine, synth: status.kind, soundfont: status.soundfont, midi: Default::default() });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -83,6 +97,7 @@ pub fn run() {
             commands::midi_list_devices,
             commands::midi_select,
             commands::set_follow_mode,
+            commands::virtual_note,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Score Studio");

@@ -16,6 +16,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rustysynth::{SoundFont, Synthesizer, SynthesizerSettings};
 use serde::Serialize;
 
+use crate::follow::Follow;
 use crate::playback::{MidiAction, Transport};
 
 /// Frames rendered between two scheduler ticks (≈ 1.5 ms at 44.1 kHz).
@@ -144,8 +145,12 @@ pub enum SynthKind {
     None,
 }
 
+/// MIDI channel for notes played live on the on-screen keyboard (not 9: drums).
+pub const LIVE_CHANNEL: u8 = 10;
+
 pub struct Engine {
     pub transport: Transport,
+    pub follow: Follow,
     synth: Option<Box<dyn Synth>>,
     actions: Vec<MidiAction>,
     left: Vec<f32>,
@@ -156,6 +161,7 @@ impl Engine {
     fn new(synth: Option<Box<dyn Synth>>) -> Self {
         Self {
             transport: Transport::new(),
+            follow: Follow::default(),
             synth,
             actions: Vec::with_capacity(128),
             left: vec![0.0; BLOCK_FRAMES],
@@ -169,6 +175,26 @@ impl Engine {
         let result = f(&mut self.transport, &mut self.actions);
         self.flush();
         result
+    }
+
+    /// Sound a note played live (on-screen keyboard), outside the transport.
+    pub fn play_live(&mut self, key: u8, velocity: u8, on: bool) {
+        if let Some(synth) = self.synth.as_mut() {
+            synth.apply(if on {
+                MidiAction::NoteOn { channel: LIVE_CHANNEL, key, velocity }
+            } else {
+                MidiAction::NoteOff { channel: LIVE_CHANNEL, key }
+            });
+        }
+    }
+
+    /// Feed a played note to follow mode and keep the transport on the expected chord.
+    pub fn follow_note(&mut self, pitch: u8) -> Vec<crate::follow::MeasureResult> {
+        let results = self.follow.note_on(pitch);
+        if let Some(ms) = self.follow.current_onset() {
+            self.with_transport(|t, out| t.seek(ms, out));
+        }
+        results
     }
 
     fn flush(&mut self) {
@@ -344,6 +370,29 @@ mod tests {
     }
 
     #[test]
+    fn follow_note_keeps_transport_on_the_expected_chord() {
+        let ev = |id: &str, pitch, onset| PlaybackEvent {
+            note_id: id.to_string(),
+            pitch,
+            onset_ms: onset,
+            dur_ms: 500.0,
+            velocity: 80,
+            staff: 1,
+            measure: 1,
+        };
+        let events = vec![ev("a", 60, 0.0), ev("b", 62, 500.0)];
+        let mut e = Engine::new(None);
+        e.follow.load(&events);
+        e.with_transport(|t, out| t.load(events, out));
+        e.follow.start(0.0);
+        e.follow_note(61); // wrong: stays
+        assert_eq!(e.transport.position_ms(), 0.0);
+        e.follow_note(60);
+        assert_eq!(e.transport.position_ms(), 500.0);
+        assert!(!e.transport.is_playing(), "follow mode never starts the clock");
+    }
+
+    #[test]
     fn engine_process_advances_transport_by_buffer_length() {
         let mut e = Engine::new(Some(Box::new(FallbackSynth::new(48_000))));
         e.with_transport(|t, out| {
@@ -355,6 +404,7 @@ mod tests {
                     dur_ms: 2000.0,
                     velocity: 90,
                     staff: 1,
+                    measure: 1,
                 }],
                 out,
             );
