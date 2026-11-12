@@ -10,7 +10,6 @@ pyproject.toml and tests/test_omr.py checks every path homr uses.
 from __future__ import annotations
 
 import os
-import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
 
@@ -113,8 +112,7 @@ class HomrBackend:
         return Path(self._main.process_image(str(image), config, XmlGeneratorArguments()))
 
     def merge(self, pages: list[Path], out: Path) -> Path:
-        from homr.relieur import process_concat
+        # Not homr's relieur: it loses <divisions> across pages (see omr/merge.py).
+        from .merge import merge_files
 
-        merged, _, _ = process_concat([str(p) for p in pages])
-        ET.ElementTree(merged).write(out, encoding="UTF-8", xml_declaration=True)
-        return out
+        return merge_files(pages, out)
