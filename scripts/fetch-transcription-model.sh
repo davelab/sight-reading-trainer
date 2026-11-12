@@ -39,7 +39,9 @@ else
   WITH+=(--with torch)
 fi
 echo "converting to ONNX (a few minutes the first time: uv installs PyTorch in a temporary environment)…" >&2
-uv run --no-project --python 3.12 "${WITH[@]}" \
+# --no-build: only prebuilt wheels, so uv picks versions that exist for this
+# machine instead of compiling one (llvmlite needs cmake and LLVM to build).
+uv run --no-project --no-build --python 3.12 "${WITH[@]}" \
   python "$ROOT/scripts/transcription/export_onnx.py" "$CKPT" "$DEST.part"
 mv "$DEST.part" "$DEST"
 echo "saved $DEST" >&2
