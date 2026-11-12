@@ -12,8 +12,9 @@ from .methods import dispatcher
 
 
 def main() -> None:
-    logging.basicConfig(stream=sys.stderr, level=logging.INFO,
-                        format="[engine] %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        stream=sys.stderr, level=logging.INFO, format="[engine] %(levelname)s %(name)s: %(message)s"
+    )
     # Line-buffered, UTF-8, LF only: one message per line.
     sys.stdout.reconfigure(encoding="utf-8", newline="\n", line_buffering=True)
     sys.stdin.reconfigure(encoding="utf-8")

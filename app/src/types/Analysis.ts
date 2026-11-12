@@ -31,9 +31,13 @@ export interface KeyRegion {
 export interface Chord {
   measure: number;
   /**
-   * 1-based beat within the measure
+   * 1-based beat within the measure, as counted by the meter
    */
   beat: number;
+  /**
+   * Position from the start of the measure, in quarter notes
+   */
+  offset?: number;
   /**
    * Chord symbol, e.g. 'D7'
    */

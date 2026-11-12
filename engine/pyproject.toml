@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
     "pydantic>=2.7,<3",
+    "music21>=9.1",
 ]
 
 [dependency-groups]

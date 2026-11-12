@@ -48,8 +48,9 @@ class Dispatcher:
         except json.JSONDecodeError as e:
             return _error(None, PARSE_ERROR, f"Parse error: {e.msg}")
         if not isinstance(req, dict) or req.get("jsonrpc") != "2.0" or "method" not in req:
-            return _error(req.get("id") if isinstance(req, dict) else None,
-                          INVALID_REQUEST, "Invalid request")
+            return _error(
+                req.get("id") if isinstance(req, dict) else None, INVALID_REQUEST, "Invalid request"
+            )
         req_id = req.get("id")
         is_notification = "id" not in req
         params = req.get("params") or {}
@@ -57,8 +58,11 @@ class Dispatcher:
             return _error(req_id, INVALID_PARAMS, "params must be an object")
         fn = self._methods.get(req["method"])
         if fn is None:
-            return None if is_notification else _error(
-                req_id, METHOD_NOT_FOUND, f"Method not found: {req['method']}")
+            return (
+                None
+                if is_notification
+                else _error(req_id, METHOD_NOT_FOUND, f"Method not found: {req['method']}")
+            )
         try:
             result = fn(params)
         except RpcError as e:
@@ -70,13 +74,17 @@ class Dispatcher:
             return None
         if isinstance(result, BaseModel):
             result = result.model_dump(by_alias=True, exclude_none=True)
-        return json.dumps({"jsonrpc": "2.0", "id": req_id, "result": result},
-                          ensure_ascii=False, separators=(",", ":"))
+        return json.dumps(
+            {"jsonrpc": "2.0", "id": req_id, "result": result},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
 
 
 def _error(req_id: Any, code: int, message: str, data: Any = None) -> str:
     err: dict[str, Any] = {"code": code, "message": message}
     if data is not None:
         err["data"] = data
-    return json.dumps({"jsonrpc": "2.0", "id": req_id, "error": err},
-                      ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(
+        {"jsonrpc": "2.0", "id": req_id, "error": err}, ensure_ascii=False, separators=(",", ":")
+    )

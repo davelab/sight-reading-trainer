@@ -30,8 +30,11 @@ def _mxl_rootfile(zf: zipfile.ZipFile) -> str:
                 return posixpath.normpath(el.attrib["full-path"])
     except KeyError:
         pass
-    candidates = [n for n in zf.namelist()
-                  if n.endswith((".xml", ".musicxml")) and not n.startswith("META-INF/")]
+    candidates = [
+        n
+        for n in zf.namelist()
+        if n.endswith((".xml", ".musicxml")) and not n.startswith("META-INF/")
+    ]
     if not candidates:
         raise MusicXmlError("no MusicXML file inside .mxl archive")
     return candidates[0]
@@ -48,8 +51,9 @@ def normalize(path: Path) -> NormalizeResult:
     if root.tag != "score-partwise":
         raise MusicXmlError(f"not a MusicXML score (root <{root.tag}>)")
 
-    names = {sp.get("id", ""): (sp.findtext("part-name") or "").strip()
-             for sp in root.iter("score-part")}
+    names = {
+        sp.get("id", ""): (sp.findtext("part-name") or "").strip() for sp in root.iter("score-part")
+    }
     parts: list[PartInfo] = []
     measures = 0
     for part in root.findall("part"):

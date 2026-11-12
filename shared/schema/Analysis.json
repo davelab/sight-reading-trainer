@@ -8,8 +8,14 @@
           "type": "integer"
         },
         "beat": {
-          "description": "1-based beat within the measure",
-          "minimum": 1,
+          "description": "1-based beat within the measure, as counted by the meter",
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "offset": {
+          "default": 0.0,
+          "description": "Position from the start of the measure, in quarter notes",
+          "minimum": 0,
           "type": "number"
         },
         "symbol": {

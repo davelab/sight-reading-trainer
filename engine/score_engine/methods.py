@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from . import __version__
+from . import __version__, analysis
 from .io import musicxml
-from .models import NormalizeResult, PingResult
+from .io import musicxml as musicxml_io
+from .models import Analysis, NormalizeResult, PingResult
 from .rpc import INVALID_PARAMS, NOT_IMPLEMENTED, Dispatcher, RpcError
 
 dispatcher = Dispatcher()
@@ -34,8 +35,12 @@ def score_normalize(params: dict[str, Any]) -> NormalizeResult:
 
 
 @dispatcher.method("analyze")
-def analyze(_params: dict[str, Any]) -> None:
-    raise RpcError(NOT_IMPLEMENTED, "analyze is planned for milestones M3/M4")
+def analyze(params: dict[str, Any]) -> Analysis:
+    musicxml = _require_str(params, "musicxml")
+    try:
+        return analysis.analyze(musicxml)
+    except musicxml_io.MusicXmlError as e:
+        raise RpcError(INVALID_PARAMS, str(e)) from e
 
 
 @dispatcher.method("omr.run")

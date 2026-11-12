@@ -6,6 +6,10 @@ This module is the SINGLE SOURCE of the schema. After changing it, run
 
 Annotations are anchored to the musical position (measure + beat), never to
 note IDs: music21 and Verovio assign different IDs, the position is the same.
+
+``measure`` is always the 1-based ORDINAL of the measure in the written score:
+a pickup is measure 1, and a measure split by a repeat ("7" + "7a") counts as
+two. It is not the printed measure number.
 """
 
 from __future__ import annotations
@@ -34,7 +38,12 @@ class KeyRegion(_Model):
 
 class Chord(_Model):
     measure: int = Field(ge=1)
-    beat: float = Field(ge=1, description="1-based beat within the measure")
+    beat: float = Field(
+        gt=0, description="1-based beat within the measure, as counted by the meter"
+    )
+    offset: float = Field(
+        default=0.0, ge=0, description="Position from the start of the measure, in quarter notes"
+    )
     symbol: str = Field(description="Chord symbol, e.g. 'D7'")
     roman: str = Field(description="Roman numeral in the local key, e.g. 'V7'")
     function: Literal["tonic", "predominant", "dominant", "other"]

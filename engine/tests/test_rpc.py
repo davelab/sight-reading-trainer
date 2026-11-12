@@ -5,7 +5,7 @@ import zipfile
 
 from score_engine import __version__
 from score_engine.methods import dispatcher
-from score_engine.rpc import METHOD_NOT_FOUND, NOT_IMPLEMENTED, PARSE_ERROR
+from score_engine.rpc import INVALID_PARAMS, METHOD_NOT_FOUND, NOT_IMPLEMENTED, PARSE_ERROR
 
 
 def call(method, params=None, req_id=1):
@@ -32,8 +32,20 @@ def test_notification_has_no_response():
 
 
 def test_planned_methods_report_not_implemented():
-    assert call("analyze", {"musicxml": ""})["error"]["code"] == NOT_IMPLEMENTED
     assert call("omr.run", {"pdfPath": "x.pdf"})["error"]["code"] == NOT_IMPLEMENTED
+
+
+def test_analyze_returns_the_analysis_schema(minuet_path):
+    result = call("analyze", {"musicxml": minuet_path.read_text()})["result"]
+    assert result["schemaVersion"] == 1
+    assert result["key"][0]["tonic"] == "G"
+    first = result["chords"][0]
+    assert set(first) >= {"measure", "beat", "offset", "symbol", "roman", "function"}
+
+
+def test_analyze_rejects_bad_input():
+    assert call("analyze", {})["error"]["code"] == INVALID_PARAMS
+    assert "error" in call("analyze", {"musicxml": "<not-a-score/>"})
 
 
 def test_normalize_minuet(minuet_path):
@@ -46,9 +58,11 @@ def test_normalize_minuet(minuet_path):
 def test_normalize_mxl(minuet_path, tmp_path):
     mxl = tmp_path / "minuet.mxl"
     with zipfile.ZipFile(mxl, "w") as zf:
-        zf.writestr("META-INF/container.xml",
-                    '<container><rootfiles><rootfile full-path="score/minuet.musicxml"/>'
-                    "</rootfiles></container>")
+        zf.writestr(
+            "META-INF/container.xml",
+            '<container><rootfiles><rootfile full-path="score/minuet.musicxml"/>'
+            "</rootfiles></container>",
+        )
         zf.write(minuet_path, "score/minuet.musicxml")
     assert call("score.normalize", {"path": str(mxl)})["result"]["measures"] == 32
 
@@ -58,7 +72,10 @@ def test_stdio_loop_keeps_stdout_clean():
     proc = subprocess.run(
         [sys.executable, "-m", "score_engine"],
         input='{"jsonrpc":"2.0","id":7,"method":"ping"}\n\n{"jsonrpc":"2.0","id":8,"method":"x"}\n',
-        capture_output=True, text=True, timeout=30, check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
     )
     lines = proc.stdout.splitlines()
     assert [json.loads(line)["id"] for line in lines] == [7, 8]
