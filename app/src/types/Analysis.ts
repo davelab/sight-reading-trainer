@@ -65,9 +65,17 @@ export interface Pattern {
    */
   occurrences: number[];
   /**
-   * Transposition interval for kind='transposed', e.g. 'P4'
+   * Transposition of the first transposed occurrence, e.g. '-P5'
    */
   interval?: string | null;
+  /**
+   * Staves the pattern is in: all, or one hand of a piano
+   */
+  hands?: "both" | "right" | "left";
+  /**
+   * Per occurrence, interval from the first one ('P1', '+M2', '-P5')
+   */
+  transpositions?: string[] | null;
 }
 /**
  * This interface was referenced by `Analysis`'s JSON-Schema

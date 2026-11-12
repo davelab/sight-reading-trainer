@@ -133,7 +133,32 @@
             }
           ],
           "default": null,
-          "description": "Transposition interval for kind='transposed', e.g. 'P4'"
+          "description": "Transposition of the first transposed occurrence, e.g. '-P5'"
+        },
+        "hands": {
+          "default": "both",
+          "description": "Staves the pattern is in: all, or one hand of a piano",
+          "enum": [
+            "both",
+            "right",
+            "left"
+          ],
+          "type": "string"
+        },
+        "transpositions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Per occurrence, interval from the first one ('P1', '+M2', '-P5')"
         }
       },
       "required": [

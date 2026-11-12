@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from ..models import Analysis, Chord, KeyRegion
+from ..models import Analysis, Chord, KeyRegion, Pattern
 from .common import measure_slices, parse_musicxml
 from .harmony import label_chords
 from .key import key_regions, tonic_name
+from .patterns import find_patterns, interval_name
 
 
 def analyze(musicxml: str) -> Analysis:
@@ -13,6 +14,7 @@ def analyze(musicxml: str) -> Analysis:
     measures = measure_slices(score)
     regions = key_regions(measures, score)
     labels = label_chords(measures, regions)
+    found = find_patterns(score)
     return Analysis(
         key=[
             KeyRegion(
@@ -36,4 +38,19 @@ def analyze(musicxml: str) -> Analysis:
             )
             for c in labels
         ],
+        patterns=[_pattern(i, f) for i, f in enumerate(found, start=1)],
+    )
+
+
+def _pattern(index: int, f) -> Pattern:
+    transpositions = [interval_name(f.anchors[0], a) for a in f.anchors]
+    moved = next((t for t in transpositions if t != "P1"), None)
+    return Pattern(
+        id=f"p{index}",
+        kind=f.kind,
+        length=f.length,
+        occurrences=[s + 1 for s in f.starts],  # measure ordinals are 1-based
+        hands=f.scope,
+        interval=moved if f.kind == "transposed" else None,
+        transpositions=transpositions if f.kind == "transposed" else None,
     )

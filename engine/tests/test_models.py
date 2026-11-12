@@ -15,7 +15,7 @@ SPEC_EXAMPLE = {
 def test_spec_example_round_trips():
     analysis = Analysis.model_validate(SPEC_EXAMPLE)
     dumped = analysis.model_dump(by_alias=True, exclude_none=True)
-    assert (
-        dumped["chords"][0].pop("offset") == 0.0
-    )  # added after the spec: defaults to the downbeat
+    # Fields added after the spec, with their defaults.
+    assert dumped["chords"][0].pop("offset") == 0.0
+    assert [p.pop("hands") for p in dumped["patterns"]] == ["both", "both"]
     assert dumped == SPEC_EXAMPLE

@@ -56,7 +56,15 @@ class Pattern(_Model):
     length: int = Field(ge=1, description="Length in measures")
     occurrences: list[int] = Field(description="Starting measure of every occurrence")
     interval: str | None = Field(
-        default=None, description="Transposition interval for kind='transposed', e.g. 'P4'"
+        default=None,
+        description="Transposition of the first transposed occurrence, e.g. '-P5'",
+    )
+    hands: Literal["both", "right", "left"] = Field(
+        default="both", description="Staves the pattern is in: all, or one hand of a piano"
+    )
+    transpositions: list[str] | None = Field(
+        default=None,
+        description="Per occurrence, interval from the first one ('P1', '+M2', '-P5')",
     )
 
 
