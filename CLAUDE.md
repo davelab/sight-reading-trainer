@@ -29,5 +29,7 @@ Specifica completa: docs/SPEC.md — leggila prima di iniziare una milestone.
 - Una milestone alla volta; chiudila solo quando i criteri di accettazione
   in docs/SPEC.md passano.
 - Ogni funzione di analisi ha un test su un file in engine/tests/fixtures/.
-- Licenze: niente dipendenze GPL/AGPL nel core senza chiedere.
+- Licenze: niente dipendenze GPL/AGPL nel core senza chiedere. Eccezione
+  approvata: homr (AGPL-3.0) per l'OMR, solo nel sidecar `omr` (vedi README,
+  «Licenze»).
 - Commit piccoli, messaggi in inglese, codice e commenti in inglese.

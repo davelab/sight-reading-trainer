@@ -250,7 +250,7 @@ Il rischio più alto è l'OMR su musica per pianoforte: accuratezza imperfetta e
 
 - Nome definitivo dell'app (Score Studio è provvisorio)
 - Modello di business: gratuita, una tantum o abbonamento (decide la questione AGPL)
-- Motore OMR: homr, Audiveris o servizio esterno
+- ~~Motore OMR: homr, Audiveris o servizio esterno~~ — **deciso (M5): homr, incluso nell'app** nel sidecar `omr`. homr è AGPL-3.0: chi distribuisce l'app che lo include deve offrirne il sorgente completo sotto AGPL-3.0.
 - SoundFont di pianoforte da includere e relativa licenza
 - Solo Apple Silicon o anche Intel
 

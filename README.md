@@ -7,7 +7,7 @@ sincronizzato, modalità "segui" via MIDI, analisi armonica e pattern ripetuti.
 - Specifica completa: [`docs/SPEC.md`](docs/SPEC.md)
 - Istruzioni per Claude Code: [`CLAUDE.md`](CLAUDE.md)
 
-## Stato: milestone M4 — pattern ripetuti
+## Stato: milestone M5 — import da PDF (OMR)
 
 ### M1 — partitura e playback
 
@@ -90,7 +90,30 @@ non tre finestre sovrapposte); il pattern può riguardare una sola mano
 (`Pattern.transpositions`); le varianti «quasi uguali» (fase 2) non ci sono
 ancora. Tempi: 0,25 s per le 313 battute di un quartetto di Beethoven.
 
-Prossime: M5 (OMR), M6 (packaging). Vedi la roadmap in `docs/SPEC.md`.
+### M5 — import da PDF (OMR)
+
+| Fatto | Dove |
+|---|---|
+| Motore OMR deciso: **homr**, incluso nell'app (vedi «Licenze») | `engine/score_engine/omr/homr_backend.py` |
+| PDF rasterizzato a 300 DPI, riconoscimento in background pagina per pagina con avanzamento e «Annulla» | `omr/jobs.py`, `omr/render.py`, `components/OmrReview` |
+| Secondo sidecar `omr` (homr, onnxruntime, OpenCV) separato dall'analisi; modelli (151 MB) scaricati una volta nella cartella dati dell'app | `scripts/build-engine.sh`, `src-tauri/src/engine.rs` |
+| Schermata di correzione: PDF originale a fianco, battute che non tornano evidenziate, clic su una nota → ↑ ↓ ♯ ♭ ♮ Elimina Annulla (anche da tastiera), «Salva MusicXML…» per MuseScore | `stores/omr.ts`, `io/correct.py` |
+| A fine correzione la partitura riconosciuta si analizza come le altre | `finishReview` |
+
+**Criterio di uscita** («licenza OMR decisa; un PDF pulito diventa MusicXML
+correggibile»): licenza decisa (homr, AGPL-3.0). `engine/tests/test_omr.py`
+riconosce con homr vero il PDF pulito del Minuetto (`tests/fixtures/minuet-in-g.pdf`,
+generato da Verovio): in 11,6 s su CPU, **186 note su 191 (97,4 %)** identiche
+per battuta, pentagramma, posizione, altezza e durata; le altre 5 sono do♯
+letti come do (battute 20–23) e 5 correzioni «♯» riportano l'originale. Il
+test si salta se i modelli non sono scaricati.
+
+Le note da correggere sono individuate per posizione (battuta, pentagramma,
+tempo, altezza), mai per ID. Il controllo automatico segnala solo le battute
+la cui durata non torna con il tempo in chiave: le altezze sbagliate (come i
+diesis persi) vanno viste confrontando con il PDF.
+
+Prossima: M6 (packaging e beta). Vedi la roadmap in `docs/SPEC.md`.
 
 ## Requisiti
 
@@ -245,6 +268,34 @@ Il passo 4 è stato verificato su Linux (Xvfb) con l'app vera e il sidecar via u
 5. «Pattern» spento: i colori spariscono.
 
 I passi 2–4 sono stati verificati su Linux (Xvfb) con l'app vera.
+
+## Test end-to-end manuale (criterio di uscita M5)
+
+1. `pnpm bundle --bundles app` (ora compila anche il sidecar `omr`) e apri l'app.
+2. Trascina `engine/tests/fixtures/minuet-in-g.pdf` nella finestra (o «Apri…»
+   → PDF). In basso a destra compare «Import di "minuet-in-g.pdf"»; la prima
+   volta «Preparazione del riconoscimento» scarica i modelli (~150 MB), poi
+   «Riconoscimento pagina 1 di 1». «Annulla» interrompe.
+3. Si apre la correzione: PDF a sinistra, partitura riconosciuta a destra,
+   suonabile con ▶. Battute 20–23: i do♯ sono do naturali.
+4. Clic sul primo do della battuta 20 → «Do5 · batt. 20»; premi D (o ♯) →
+   «Do♯5», il diesis compare. ⌘Z annulla. ↑/↓ spostano di un grado secondo
+   l'armatura, ⌫ trasforma la nota in pausa.
+5. «Salva MusicXML…» salva il file corretto; «Fine correzione» apre la
+   partitura con analisi armonica e pattern.
+6. Prova un PDF tuo, pulito (esportato da un programma di notazione): le
+   battute che non tornano compaiono in arancione con il motivo.
+
+I passi 2–5 sono stati verificati su Linux (Xvfb) con l'app vera e homr.
+
+## Licenze
+
+Il codice di Score Studio è MIT. L'import da PDF usa
+[homr](https://github.com/liebharc/homr), con licenza **AGPL-3.0**, incluso
+nel sidecar `omr` dell'app (decisione presa per la M5). Chi distribuisce l'app
+impacchettata con homr deve offrire ai destinatari il sorgente completo
+corrispondente sotto AGPL-3.0. Prima di vendere l'app serve un parere legale
+(vedi `docs/SPEC.md`, «Rischi e decisioni aperte»).
 
 ## Note di architettura
 
