@@ -130,3 +130,14 @@ def test_grace_note_shares_the_next_onset():
     xml = symbols_to_musicxml([HEAD + seq])
     assert check(xml) == []
     assert "<grace" in xml
+
+
+def test_cross_staff_triplet_groups_are_repaired():
+    """Arpeggio triplets beamed from the bass staff to the treble: the model reads the
+    treble note of each group as a plain sixteenth (BWV 851a, measures 6-8)."""
+    good = [note("4", "C5")] * 4 + [BAR]
+    group = [note("24", "G3", "lower"), note("24", "B3", "lower"), note("16", "D5", "upper")]
+    xml = symbols_to_musicxml([HEAD + good + good + group * 8 + [BAR]])
+    assert check(xml) == []
+    m3 = xml.split('<measure number="3">')[1]
+    assert m3.count("<time-modification>") == 24

@@ -228,19 +228,70 @@ def _untuple(s: Symbol) -> Symbol:
     return _Untupled(f"{m[1]}_{base}{m[3]}", s.pitch, s.lift, s.articulation, s.slur, s.position)
 
 
+def _kern(s: Symbol) -> int | None:
+    m = re.match(r"(?:note|rest)_(\d+)$", s.rhythm)
+    return int(m[1]) if m else None
+
+
+def _retuple(s: Symbol, tuplet_kern: int) -> Symbol:
+    """The plain value of a tuplet (16 for 24) made a tuplet again."""
+    m = re.match(r"(note|rest)_(\d+)$", s.rhythm)
+    if not m:
+        return s
+    return _Untupled(f"{m[1]}_{tuplet_kern}", s.pitch, s.lift, s.articulation, s.slur, s.position)
+
+
+def _with_stray_notes_retupled(symbols: list, adjacent_only: bool) -> list:
+    """Plain notes among tuplets read as tuplets too.
+
+    Across two staves (an arpeggio beamed from the bass staff to the treble)
+    the model reads the notes on one staff as triplet sixteenths and the
+    note on the other as a plain sixteenth: the group then lasts too long.
+    """
+    kerns = Counter(k for s in symbols if (k := _kern(s)) and k & (k - 1))
+    if not kerns:
+        return symbols
+    tuplet = kerns.most_common(1)[0][0]  # e.g. 24
+    plain = 1 << (tuplet.bit_length() - 1)  # e.g. 16
+    timed = [i for i, s in enumerate(symbols) if _kern(s) is not None]
+    out = list(symbols)
+    for n, i in enumerate(timed):
+        if _kern(symbols[i]) != plain:
+            continue
+        if adjacent_only:
+            neighbours = [symbols[timed[j]] for j in (n - 1, n + 1) if 0 <= j < len(timed)]
+            if not any(_kern(x) == tuplet for x in neighbours):
+                continue
+        out[i] = _retuple(symbols[i], tuplet)
+    return out
+
+
 def repair_tuplets(measures: list[Measure], expected: Fraction) -> int:
-    """Measures that do not add up but would without their tuplets: the model read plain
-    notes as tuplets. Re-time them without; returns how many were repaired."""
+    """Repair measures that do not add up because the model mixed up tuplets and plain notes.
+
+    Tried in order, and kept only if the measure then lasts exactly `expected`:
+    1. plain notes next to tuplets made tuplets (cross-staff tuplet groups);
+    2. every plain note of the tuplets' value made a tuplet;
+    3. every tuplet made plain (plain notes read as tuplets).
+    Returns how many measures were repaired.
+    """
     repaired = 0
     for m in measures:
         has_tuplets = any(e.duration.actual != e.duration.normal for e in m.events)
         if m.length == expected or not has_tuplets:
             continue
-        retimed = to_measures([_untuple(s) for s in m.symbols])[0][0]
-        if retimed.length == expected:
-            m.events = retimed.events
-            m.marks = retimed.marks
-            repaired += 1
+        candidates = (
+            _with_stray_notes_retupled(m.symbols, adjacent_only=True),
+            _with_stray_notes_retupled(m.symbols, adjacent_only=False),
+            [_untuple(s) for s in m.symbols],
+        )
+        for symbols in candidates:
+            retimed = to_measures(symbols)[0][0]
+            if retimed.length == expected:
+                m.events = retimed.events
+                m.marks = retimed.marks
+                repaired += 1
+                break
     return repaired
 
 

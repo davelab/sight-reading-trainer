@@ -100,3 +100,16 @@ def test_delete_inside_a_beamed_group_rebeams_the_voice(xml):
         '<beam number="1">end</beam>'
     )
     assert rh(out, 1) == ["D5", "G4", "rest", "B4", "C5"]
+
+
+def test_check_accepts_a_staff_left_empty_by_cross_staff_writing(xml):
+    # Measure 8: the right hand's dotted half A4 becomes a quarter: the staff stops two
+    # beats early while the left hand completes the measure (like BWV 851a, m. 14).
+    head, rest = xml.split('<measure number="8">', 1)
+    body, tail = rest.split("</measure>", 1)
+    a4 = "<duration>6</duration><voice>1</voice><type>half</type><dot/>"
+    assert a4 in body
+    body = body.replace(a4, "<duration>2</duration><voice>1</voice><type>quarter</type>", 1)
+    body = body.replace("<backup><duration>6</duration>", "<backup><duration>2</duration>", 1)
+    shortened = head + '<measure number="8">' + body + "</measure>" + tail
+    assert all(w.measure != 8 for w in check(shortened))

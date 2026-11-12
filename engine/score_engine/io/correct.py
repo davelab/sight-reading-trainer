@@ -175,6 +175,10 @@ def check(musicxml: str) -> list[OmrWarning]:
     """Measures whose notes do not add up to the time signature: the usual OMR error.
 
     A shorter first measure (pickup) and last measure are normal and not reported.
+    A staff that stops at least a beat early while another staff of the part
+    completes the measure is not reported either: the music has moved to the
+    other staff (cross-staff writing leaves no rests). A staff short by less
+    than a beat is: a short note was most likely missed.
     """
     root = _parse(musicxml)
     _, measures = walk(root)
@@ -182,12 +186,17 @@ def check(musicxml: str) -> list[OmrWarning]:
     last = max((m.ordinal for m in measures), default=0)
     warnings: list[OmrWarning] = []
     for info in measures:
+        part_filled = max(info.filled.values(), default=Fraction(0))
+        beat = Fraction(4, info.time[1])
         for staff in range(info.first_staff, info.first_staff + info.staves):
             filled = info.filled.get(staff, Fraction(0))
             if filled == 0 or filled == info.expected:
                 continue
             if filled < info.expected and info.ordinal in (1, last):
                 continue
+            if filled < info.expected and part_filled == info.expected:
+                if info.expected - filled >= beat:
+                    continue  # the music moved to the other staff
             who = _staff_name(info, staff, parts)
             what = "troppo piena" if filled > info.expected else "incompleta"
             beat_type = info.time[1]
