@@ -154,22 +154,139 @@ def _run_agent(
     return score, beats
 
 
-def track_beats(notes: list[NoteEvent], correction: float = CORRECTION) -> np.ndarray:
-    """Beat times (s) covering the notes: the best of several agents, each started
-    from a tempo hypothesis and one of the first attacks."""
+@dataclass
+class _Agent:
+    beat: float
+    period: float
+    lowest: float
+    highest: float
+    score: float
+    beats: list[float]
+    j: int  # first event not yet considered
+
+
+BEAM = 24  # agents kept at a time
+PRIOR_BPM, PRIOR_WIDTH = 100.0, 0.8  # likely beat tempo, and its spread in octaves
+HINT_WIDTH = 0.35  # spread around a tempo the user gave: rubato yes, 3/2 or 2/1 no
+FORK_WINDOW = 0.4  # of the period: a strong attack this far off may be the beat
+FORK_CLOSENESS = 0.5  # what a forked agent scores for that attack
+
+
+def _step(agent: _Agent, events: list[_Event], correction: float, strong: float) -> list[_Agent]:
+    """One beat further: the agent itself (on the best attack near the prediction,
+    or on the prediction), plus forks onto strong attacks a little further off, in
+    case the tempo changed abruptly there."""
+    predicted = agent.beat + agent.period
+    inner, outer = 0.25 * agent.period, FORK_WINDOW * agent.period
+    j = agent.j
+    while j < len(events) and events[j].time < predicted - outer:
+        j += 1
+    best, best_value, forks = None, 0.0, []
+    k = j
+    while k < len(events) and events[k].time <= predicted + outer:
+        off = abs(events[k].time - predicted)
+        if off <= inner:
+            value = events[k].salience * (1 - off / inner)
+            if value > best_value:
+                best, best_value = k, value
+        elif events[k].salience >= strong:
+            forks.append(k)
+        k += 1
+
+    def moved(to: int | None, gain: float) -> _Agent:
+        if to is None:
+            return _Agent(
+                predicted,
+                agent.period,
+                agent.lowest,
+                agent.highest,
+                agent.score,
+                [*agent.beats, predicted],
+                j,
+            )
+        error = events[to].time - predicted
+        period = float(np.clip(agent.period + correction * error, agent.lowest, agent.highest))
+        return _Agent(
+            events[to].time,
+            period,
+            agent.lowest,
+            agent.highest,
+            agent.score + gain,
+            [*agent.beats, events[to].time],
+            to + 1,
+        )
+
+    out = [moved(best, best_value)]
+    out += [moved(k, events[k].salience * FORK_CLOSENESS) for k in forks]
+    return out
+
+
+def _value(agent: _Agent, centre: float = PRIOR_BPM, width: float = PRIOR_WIDTH) -> float:
+    """Score, weighed by how likely its tempo is as a beat (a pulse twice as fast
+    explains more attacks, but is rarely what the music is written in)."""
+    if len(agent.beats) < 2:
+        return agent.score
+    period = (agent.beats[-1] - agent.beats[0]) / (len(agent.beats) - 1)
+    return agent.score * float(np.exp(-0.5 * (np.log2(60 / period / centre) / width) ** 2))
+
+
+def track_beats(
+    notes: list[NoteEvent], correction: float = CORRECTION, tempo: float | None = None
+) -> np.ndarray:
+    """Beat times (s) covering the notes. Agents start from each tempo hypothesis
+    and each of the first attacks, and advance together through the music; at an
+    abrupt tempo change an agent forks, and the agents that explain the attacks
+    best are kept, weighed by how plausible their tempo is: around 100 bpm, or
+    close to `tempo` when the user gave it (so the beat does not slide to a
+    half, double or dotted pulse; rubato around it stays possible)."""
     if not notes:
         return np.array([])
     events = onset_events(notes)
     end = max(n.offset for n in notes)
     first = events[0].time
+    strong = float(np.median([e.salience for e in events]))
     starts = [i for i, e in enumerate(events) if e.time - first <= 2.0][:8]
-    best: tuple[float, list[float]] | None = None
-    for period in tempo_hypotheses(events):
+    periods = tempo_hypotheses(events)
+    if tempo:
+        periods = [60 / tempo] + [p for p in periods if abs(p * tempo / 60 - 1) > 0.06]
+
+    def value(agent: _Agent) -> float:
+        return _value(agent, tempo, HINT_WIDTH) if tempo else _value(agent)
+
+    agents = []
+    for p in periods:
+        lowest, highest = p * LEVEL_RANGE[0], p * LEVEL_RANGE[1]
         for i in starts:
-            score, beats = _run_agent(events, i, period, end, correction)
-            if best is None or score > best[0]:
-                best = (score, beats)
-    beats = np.array(best[1] if best else [first])
+            agents.append(
+                _Agent(
+                    events[i].time, p, lowest, highest, events[i].salience, [events[i].time], i + 1
+                )
+            )
+    horizon = first
+    while True:
+        horizon += 0.25
+        moving = [a for a in agents if a.beat + 0.5 * a.period < end]
+        if not moving:
+            break
+        nxt: list[_Agent] = [a for a in agents if a not in moving]
+        for a in moving:
+            if a.beat >= horizon:
+                nxt.append(a)
+                continue
+            nxt.extend(_step(a, events, correction, strong))
+        # Agents on the same beat at the same tempo are one: keep the best.
+        nxt.sort(key=lambda a: -value(a))
+        kept: list[_Agent] = []
+        for a in nxt:
+            if all(
+                abs(a.beat - b.beat) > 0.03 or abs(a.period / b.period - 1) > 0.05 for b in kept
+            ):
+                kept.append(a)
+            if len(kept) == BEAM:
+                break
+        agents = kept
+    best = max(agents, key=value)
+    beats = np.array(best.beats)
     if len(beats) > 1 and beats[0] - first > 0.25 * (beats[1] - beats[0]):
         beats = np.concatenate([_track_back(events, beats), beats])
     return beats

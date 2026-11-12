@@ -163,6 +163,30 @@ class OmrProgress(_Model):
     total: int = Field(ge=0)
 
 
+class TranscribeHints(_Model):
+    """What the user already knows about the piece (``transcribe.run``); every field
+    is optional and the transcription infers what is missing."""
+
+    tempo: float | None = Field(
+        default=None, ge=20, le=300, description="Approximate quarter notes per minute"
+    )
+    beats_per_measure: int | None = Field(
+        default=None,
+        alias="beatsPerMeasure",
+        ge=2,
+        le=4,
+        description="Quarter-note meter: 2, 3 or 4",
+    )
+    key: str | None = Field(
+        default=None,
+        pattern=r"^[A-G](#|b)? (major|minor)$",
+        description="e.g. 'G major', 'Bb minor'",
+    )
+    pickup_beats: int | None = Field(
+        default=None, alias="pickupBeats", ge=0, le=3, description="Beats before the first bar line"
+    )
+
+
 class TranscribeFacts(_Model):
     """What the transcription inferred about the performance."""
 
@@ -204,4 +228,5 @@ EXPORTED_MODELS: dict[str, type[BaseModel]] = {
     "OmrProgress": OmrProgress,
     "TranscribeResult": TranscribeResult,
     "TranscribeProgress": TranscribeProgress,
+    "TranscribeHints": TranscribeHints,
 }

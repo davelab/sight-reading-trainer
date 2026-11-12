@@ -274,9 +274,14 @@ pub async fn omr_cancel(state: State<'_, AppState>, job_id: String) -> CmdResult
 /// which also runs the transcription model. Returns `{jobId}` at once; progress
 /// and outcome arrive as `transcribe:progress`, `transcribe:done`, `transcribe:failed`.
 #[tauri::command]
-pub async fn transcribe_audio(state: State<'_, AppState>, path: String) -> CmdResult<serde_json::Value> {
+pub async fn transcribe_audio(
+    state: State<'_, AppState>,
+    path: String,
+    hints: Option<serde_json::Value>,
+) -> CmdResult<serde_json::Value> {
     let client = state.omr.clone();
-    let params = serde_json::json!({ "audioPath": path });
+    // `hints`: what the user knows (TranscribeHints: tempo, meter, key, pickup).
+    let params = serde_json::json!({ "audioPath": path, "hints": hints });
     tauri::async_runtime::spawn_blocking(move || client.request("transcribe.run", params, Duration::from_secs(120)))
         .await
         .map_err(|e| e.to_string())?

@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from score_engine.io.xml_walk import walk
+from score_engine.models import TranscribeHints
 from score_engine.transcribe import jobs as tx_jobs
 from score_engine.transcribe import model as tx_model
 from score_engine.transcribe.beats import to_beats, track_beats
@@ -226,3 +227,39 @@ def test_job_cancel(tmp_path, monkeypatch):
 def test_rejects_non_audio(tmp_path):
     with pytest.raises(ValueError, match="formato audio"):
         tx_jobs.TranscribeJobs(lambda *_: None).start(tmp_path / "score.pdf")
+
+
+def test_abrupt_tempo_change_is_followed():
+    """100 bpm, then suddenly 140: the beat must not slide to a dotted pulse."""
+    xml, facts = to_score(perform(lambda m: 100 if m < 16 else 140, seed=1), [])
+    assert facts["beatsPerMeasure"] == 3
+    assert agreement(xml) >= 0.95
+
+
+def test_tempo_hint_resolves_a_fast_piece():
+    """At 200 bpm the plain tracker hears half time; an approximate tempo fixes it."""
+    notes = perform(lambda m: 200, seed=1)
+    assert agreement(to_score(notes, [])[0]) < 0.5
+    for guess in (180, 200, 220):
+        xml, facts = to_score(notes, [], hints=TranscribeHints(tempo=guess))
+        assert facts["beatsPerMeasure"] == 3 and abs(facts["tempo"] - 200) <= 5
+        assert agreement(xml) >= 0.95
+
+
+def test_meter_pickup_and_key_hints():
+    # The piece starts on the third beat of the first bar: a one-beat pickup.
+    late = [n for n in perform(lambda m: 110, seed=2) if n.onset >= 2 * 60 / 110 - 0.05]
+    _, facts = to_score(late, [], hints=TranscribeHints(pickupBeats=1))
+    assert facts["pickupBeats"] == 1.0
+    _, facts = to_score(perform(lambda m: 120), [], hints=TranscribeHints(beatsPerMeasure=2))
+    assert facts["beatsPerMeasure"] == 2
+    xml, facts = to_score(perform(lambda m: 120), [], hints=TranscribeHints(key="E minor"))
+    assert facts["key"] == "E minor" and "<fifths>1</fifths>" in xml
+
+
+def test_hints_are_validated():
+    with pytest.raises(ValueError):
+        TranscribeHints.model_validate({"key": "H major"})
+    with pytest.raises(ValueError):
+        TranscribeHints.model_validate({"beatsPerMeasure": 7})
+    assert TranscribeHints.model_validate({"key": "Bb minor", "tempo": 72}).tempo == 72

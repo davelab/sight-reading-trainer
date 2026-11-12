@@ -173,10 +173,17 @@ def transcribe_run(params: dict[str, Any]) -> dict[str, str]:
     path = Path(_require_str(params, "audioPath"))
     if not path.is_file():
         raise RpcError(INVALID_PARAMS, f"file not found: {path}")
+    from pydantic import ValidationError
+
+    from .models import TranscribeHints
     from .transcribe.model import ModelMissing
 
     try:
-        return {"jobId": tx_jobs().start(path)}
+        hints = TranscribeHints.model_validate(params.get("hints") or {})
+    except ValidationError as e:
+        raise RpcError(INVALID_PARAMS, f"suggerimenti non validi: {e}") from e
+    try:
+        return {"jobId": tx_jobs().start(path, hints)}
     except (ValueError, ModelMissing) as e:
         raise RpcError(INVALID_PARAMS, str(e)) from e
 

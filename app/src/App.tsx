@@ -6,6 +6,7 @@ import { Keyboard } from './components/Keyboard'
 import { MidiPanel } from './components/MidiPanel'
 import { OmrPages, OmrProgress, OmrReviewBar } from './components/OmrReview'
 import { ScoreView } from './components/ScoreView'
+import { TranscribeSetup } from './components/TranscribeSetup'
 import { Transport } from './components/Transport'
 import { useFileDrop } from './hooks/useFileDrop'
 import { useMidiEvents } from './hooks/useMidiEvents'
@@ -151,6 +152,7 @@ export default function App() {
         )}
       </main>
       <OmrProgress />
+      <TranscribeSetup />
       <Keyboard />
       <Transport />
       {dropping && <div className="drop-overlay">Rilascia per aprire</div>}

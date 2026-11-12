@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from ..io.correct import check
-from ..models import TranscribeFacts, TranscribeProgress, TranscribeResult
+from ..models import TranscribeFacts, TranscribeHints, TranscribeProgress, TranscribeResult
 
 log = logging.getLogger("score_engine.transcribe")
 
@@ -37,7 +37,7 @@ class TranscribeJobs:
         self._cancel: dict[str, threading.Event] = {}
         self._lock = threading.Lock()
 
-    def start(self, audio: Path) -> str:
+    def start(self, audio: Path, hints: TranscribeHints | None = None) -> str:
         if audio.suffix.lower() not in AUDIO_SUFFIXES:
             raise ValueError(f"formato audio non supportato: {audio.suffix or audio.name}")
         from .model import model_path
@@ -48,7 +48,7 @@ class TranscribeJobs:
         with self._lock:
             self._cancel[job_id] = cancel
         threading.Thread(
-            target=self._run, args=(job_id, audio, cancel), name=f"tx-{job_id}", daemon=True
+            target=self._run, args=(job_id, audio, cancel, hints), name=f"tx-{job_id}", daemon=True
         ).start()
         return job_id
 
@@ -63,9 +63,11 @@ class TranscribeJobs:
         payload = TranscribeProgress(jobId=job_id, stage=stage, fraction=fraction)  # type: ignore[arg-type]
         self.notify("transcribe.progress", payload.model_dump(by_alias=True))
 
-    def _run(self, job_id: str, audio: Path, cancel: threading.Event) -> None:
+    def _run(
+        self, job_id: str, audio: Path, cancel: threading.Event, hints: TranscribeHints | None
+    ) -> None:
         try:
-            result = transcribe(audio, job_id, cancel, self._progress)
+            result = transcribe(audio, job_id, cancel, self._progress, hints)
             self.notify("transcribe.done", result.model_dump(by_alias=True))
         except Cancelled:
             self.notify(
@@ -87,6 +89,7 @@ def transcribe(
     job_id: str = "",
     cancel: threading.Event | None = None,
     progress: Callable[[str, str, float], None] = lambda *_: None,
+    hints: TranscribeHints | None = None,
 ) -> TranscribeResult:
     from .audio import SAMPLE_RATE, load_audio
     from .midi import to_midi
@@ -113,7 +116,7 @@ def transcribe(
     if not notes:
         raise ValueError("nessuna nota di pianoforte riconosciuta nella registrazione")
     check_cancel()
-    musicxml, facts = to_score(notes, pedals, title=audio.stem)
+    musicxml, facts = to_score(notes, pedals, title=audio.stem, hints=hints)
     progress(job_id, "notation", 1.0)
     return TranscribeResult(
         jobId=job_id,

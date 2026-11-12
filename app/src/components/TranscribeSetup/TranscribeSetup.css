@@ -1,0 +1,53 @@
+.tx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.25);
+}
+.tx-setup {
+  width: min(440px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.25);
+}
+.tx-setup h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.tx-help,
+.tx-setup small {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.tx-setup label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tx-setup label > span:first-child {
+  font-weight: 600;
+  font-size: 13px;
+}
+.tx-tempo {
+  display: flex;
+  gap: 8px;
+}
+.tx-tempo input {
+  flex: 1;
+  min-width: 0;
+}
+.tx-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}

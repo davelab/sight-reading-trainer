@@ -11,6 +11,7 @@ import type {
   NoteRef,
   OmrProgress,
   OmrResult,
+  TranscribeHints,
   TranscribeProgress,
   TranscribeResult
 } from '../types'
@@ -95,7 +96,8 @@ export const ipc = {
   saveBinaryFile: (path: string, contents: Uint8Array) =>
     invoke<void>('save_binary_file', { path, contents: Array.from(contents) }),
   /** Start transcribing a piano recording; progress and result arrive as transcribe:* events. */
-  transcribeAudio: (path: string) => invoke<{ jobId: string }>('transcribe_audio', { path }),
+  transcribeAudio: (path: string, hints: TranscribeHints = {}) =>
+    invoke<{ jobId: string }>('transcribe_audio', { path, hints }),
   transcribeCancel: (jobId: string) => invoke<{ cancelled: boolean }>('transcribe_cancel', { jobId })
 }
 

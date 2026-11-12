@@ -19,6 +19,7 @@ from fractions import Fraction
 
 import numpy as np
 
+from ..models import TranscribeHints
 from .beats import to_beats, track_beats
 from .postprocess import NoteEvent, PedalEvent
 
@@ -49,13 +50,18 @@ def beat_accents(beats: np.ndarray, notes: list[NoteEvent]) -> np.ndarray:
     return acc
 
 
-def _downbeat_path(acc: np.ndarray, meter: int) -> tuple[float, list[int]]:
+def _downbeat_path(
+    acc: np.ndarray, meter: int, anchor: int | None = None
+) -> tuple[float, list[int]]:
     """Viterbi over positions in the measure (0 = downbeat). Each beat moves to the
-    next position; restarting a measure early or late costs SLIP_COST."""
+    next position; restarting a measure early or late costs SLIP_COST. `anchor`:
+    a beat known to be a downbeat (from the pickup the user gave)."""
     scale = float(np.median(acc[acc > 0])) if np.any(acc > 0) else 1.0
     a = acc / scale
     n = len(a)
     emit = np.where(np.arange(meter)[None, :] == 0, a[:, None], -0.5 * a[:, None])
+    if anchor is not None and 0 <= anchor < n:
+        emit[anchor, 1:] = -1e6
     score = emit[0].copy()
     back = np.zeros((n, meter), dtype=int)
     for t in range(1, n):
@@ -86,16 +92,22 @@ def _downbeat_path(acc: np.ndarray, meter: int) -> tuple[float, list[int]]:
     return contrast - SLIP_COST * slips / len(down), path
 
 
-def choose_meter(beats: np.ndarray, notes: list[NoteEvent]) -> tuple[int, list[int]]:
-    """Beats per measure, and the position of every beat in its measure."""
+def choose_meter(
+    beats: np.ndarray,
+    notes: list[NoteEvent],
+    meter: int | None = None,
+    anchor: int | None = None,
+) -> tuple[int, list[int]]:
+    """Beats per measure (or the given `meter`), and the position of every beat in
+    its measure (`anchor`: a beat that must be a downbeat)."""
     acc = beat_accents(beats, notes)
     best: tuple[float, int, list[int]] | None = None
-    for meter in (4, 3, 2):
-        value, path = _downbeat_path(acc, meter)
-        if meter == 4:
+    for candidate in (meter,) if meter else (4, 3, 2):
+        value, path = _downbeat_path(acc, candidate, anchor)
+        if candidate == 4:
             value += 0.02  # 4 over 2 when they explain the same downbeats
         if best is None or value > best[0]:
-            best = (value, meter, path)
+            best = (value, candidate, path)
     assert best is not None
     return best[1], best[2]
 
@@ -180,9 +192,13 @@ def split_hands(placed: list[Placed], meter: int) -> None:
 
 
 def to_score(
-    notes: list[NoteEvent], pedals: list[PedalEvent] | None = None, title: str = ""
+    notes: list[NoteEvent],
+    pedals: list[PedalEvent] | None = None,
+    title: str = "",
+    hints: TranscribeHints | None = None,
 ) -> tuple[str, dict]:
-    """MusicXML of the transcription, and facts about it (tempo, meter, key)."""
+    """MusicXML of the transcription, and facts about it (tempo, meter, key).
+    `hints`: what the user knows (tempo, meter, key, pickup); the rest is inferred."""
     from music21 import (
         chord,
         clef,
@@ -199,14 +215,26 @@ def to_score(
 
     if not notes:
         raise ValueError("nessuna nota trascritta")
-    beats = track_beats(notes)
-    meter_beats, positions = choose_meter(beats, notes)
+    hints = hints or TranscribeHints()
+    onsets = np.array([n.onset for n in notes])
+
+    def anchor(beats: np.ndarray) -> int | None:
+        """The first downbeat, when the user said how many beats come before it."""
+        if hints.pickup_beats is None:
+            return None
+        return int(round(float(np.min(to_beats(onsets, beats))))) + hints.pickup_beats
+
+    beats = track_beats(notes, tempo=hints.tempo)
+    meter_beats, positions = choose_meter(beats, notes, hints.beats_per_measure, anchor(beats))
     beats = regularize(beats, positions, meter_beats, beat_accents(beats, notes))
-    # Re-find the downbeats on the regular grid (no slips left).
-    positions = choose_meter(beats, notes)[1] if len(beats) else positions
+    # Re-find the downbeats on the regular grid (no slips left), same meter.
+    if len(beats):
+        positions = choose_meter(beats, notes, meter_beats, anchor(beats))[1]
     first = next((i for i, p in enumerate(positions) if p == 0), 0)
     on_beats = to_beats(np.array([n.onset for n in notes]), beats)
     first_downbeat = first if first <= float(np.min(on_beats)) + 0.5 else first - meter_beats
+    if (known := anchor(beats)) is not None:
+        first_downbeat = known
     placed = quantize(notes, beats, first_downbeat)
     pickup = Fraction(0)
     lowest = min(p.onset for p in placed)
@@ -254,7 +282,7 @@ def to_score(
     for hand in (1, 2):
         score.insert(0, parts[hand])
     score.insert(0, _staff_group(parts))
-    detected = score.analyze("key")
+    detected = _hinted_key(hints.key) if hints.key else score.analyze("key")
     for part in parts.values():
         part.insert(0, key.KeySignature(detected.sharps))
     _spell(score, detected)
@@ -270,6 +298,14 @@ def to_score(
         "pickupBeats": float(pickup),
     }
     return xml, facts
+
+
+def _hinted_key(name: str):  # noqa: ANN202
+    """'Bb minor' -> music21 Key."""
+    from music21 import key
+
+    tonic, mode = name.split()
+    return key.Key(tonic[0] + tonic[1:].replace("b", "-"), mode)
 
 
 def _staff_group(parts):  # noqa: ANN001, ANN202

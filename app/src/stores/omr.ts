@@ -14,16 +14,19 @@ import {
 } from '../lib/ipc'
 import { openMusicXml } from '../lib/loadScore'
 import { findNote } from '../lib/noteRefs'
-import type { NoteRef, OmrProgress, OmrWarning, TranscribeFacts, TranscribeProgress } from '../types'
+import type { NoteRef, OmrProgress, OmrWarning, TranscribeFacts, TranscribeHints, TranscribeProgress } from '../types'
 import { runAnalysis } from './analysis'
 import { useScore } from './score'
 
 /**
  * PDF import (OMR) or audio transcription, and the correction of the resulting score.
- * idle → running (progress) → review (correct, then «Fine») → idle; or error.
+ * idle → [setup: what the user knows, audio only] → running (progress) →
+ * review (correct, then «Fine») → idle; or error.
  */
 export interface OmrState {
-  phase: 'idle' | 'running' | 'review' | 'error'
+  phase: 'idle' | 'setup' | 'running' | 'review' | 'error'
+  /** Audio file waiting for the user's hints (phase 'setup'). */
+  pendingPath: string | null
   /** Where the score comes from: a PDF (OMR) or a recording (transcription). */
   source: 'pdf' | 'audio'
   jobId: string | null
@@ -47,6 +50,7 @@ export interface OmrState {
 
 const initial: Omit<OmrState, never> = {
   phase: 'idle',
+  pendingPath: null,
   source: 'pdf',
   jobId: null,
   fileName: null,
@@ -88,9 +92,17 @@ export async function startAudioTranscription(path: string): Promise<void> {
     useOmr.setState({ ...initial, source: 'audio', phase: 'error', error: "La trascrizione richiede l'app desktop" })
     return
   }
-  useOmr.setState({ ...initial, source: 'audio', phase: 'running', fileName: baseName(path) })
+  // First ask what the user already knows about the piece (TranscribeSetup).
+  useOmr.setState({ ...initial, source: 'audio', phase: 'setup', pendingPath: path, fileName: baseName(path) })
+}
+
+/** Start the transcription of the pending file, with the user's hints. */
+export async function runTranscription(hints: TranscribeHints): Promise<void> {
+  const { pendingPath: path, phase } = useOmr.getState()
+  if (!path || phase !== 'setup') return
+  useOmr.setState({ phase: 'running', pendingPath: null })
   try {
-    const { jobId } = await ipc.transcribeAudio(path)
+    const { jobId } = await ipc.transcribeAudio(path, hints)
     useOmr.setState((s) => ({
       jobId,
       transcribeProgress: s.transcribeProgress?.jobId === jobId ? s.transcribeProgress : null
@@ -102,8 +114,8 @@ export async function startAudioTranscription(path: string): Promise<void> {
 
 /** Cancel the running PDF import or transcription. */
 export async function cancelImport(): Promise<void> {
-  const { jobId, source } = useOmr.getState()
-  if (!jobId) useOmr.setState({ ...initial })
+  const { jobId, source, phase } = useOmr.getState()
+  if (!jobId || phase === 'setup') useOmr.setState({ ...initial })
   else if (source === 'audio') await ipc.transcribeCancel(jobId)
   else await ipc.omrCancel(jobId)
 }

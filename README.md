@@ -136,13 +136,16 @@ in partitura e MIDI. Funziona offline, senza GPU.
 | Note, velocity e pedale con la rete di ByteDance (Kong et al. 2021, MIT) convertita in ONNX: niente PyTorch nell'app | `engine/score_engine/transcribe/model.py`, `postprocess.py` |
 | Battiti che seguono l'esecutore (agenti alla BeatRoot, anche all'indietro per l'inizio): il rubato finisce nella griglia, non in ritmi strani | `transcribe/beats.py` |
 | Metro e primi tempi (Viterbi sugli accenti: bassi, accordi, dinamica), battute regolari, griglia a semicrome o terzine per ogni battito, mani divise per altezza, tonalità e grafia delle alterazioni, segni di pedale | `transcribe/notation.py` |
+| Prima di trascrivere, suggerimenti facoltativi: tempo (anche «Batti il tempo»), metro, tonalità, levare; il resto si deduce | `components/TranscribeSetup`, `TranscribeHints` in `models.py` |
 | Job in background con avanzamento e «Annulla»; revisione con gli stessi strumenti dell'OMR; «Salva MIDI…» (l'esecuzione com'era, con rubato e pedale) e «Salva MusicXML…» | `transcribe/jobs.py`, `stores/omr.ts`, `components/OmrReview` |
 
-Su un minuetto sintetizzato: 100% delle note nella battuta e nel tempo giusti a
-tempo costante, 90% con rubato forte (tempo tra 90 e 150 per battuta). Limiti
-noti: un ritardando che dimezza il tempo dentro una battuta (ultime battute del
-test) e i cambi di tempo improvvisi del 40% possono spostare il battito; lì si
-corregge in revisione, oppure si parte dal MIDI.
+Su un minuetto (note giuste in battuta, tempo e altezza): 100% a tempo costante,
+90% dall'audio con rubato forte, 100% con un cambio improvviso da 100 a 140 bpm,
+82% con il tempo che salta a caso tra 90 e 150 a ogni battuta. A 200 bpm il
+sistema da solo sente metà tempo (16%); indicando un tempo anche approssimativo
+(180–220) arriva al 96–100%. Il levare non si deduce in modo affidabile: se il
+brano inizia in levare, indicalo. Limite noto: un ritardando che dimezza il
+tempo dentro una battuta; lì si corregge in revisione, oppure si parte dal MIDI.
 
 Il modello (154 MB) non è nel repository: `scripts/fetch-transcription-model.sh`
 lo scarica da Zenodo e lo converte una volta (vedi «Installazione», passo 2).
