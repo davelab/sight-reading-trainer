@@ -96,3 +96,26 @@
   font-weight: 800;
   pointer-events: none;
 }
+/* PDF review. */
+.score-view rect.omr-warning {
+  fill: #f08c00;
+  fill-opacity: 0.22;
+  pointer-events: none;
+}
+.score-view g.note.omr-selected,
+.score-view g.note.omr-selected * {
+  fill: var(--accent) !important;
+  stroke: var(--accent) !important;
+}
+.score-view g.measure.flash {
+  animation: measure-flash 1.2s ease-out;
+}
+@keyframes measure-flash {
+  0%,
+  40% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+  }
+}

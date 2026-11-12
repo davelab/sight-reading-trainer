@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { inTauri, ipc } from '../../lib/ipc'
 import { drawAnalysis, systemSpacingFor } from '../../lib/analysisOverlay'
-import { followCursor, highlightNotes, markMeasures } from '../../lib/overlay'
+import { followCursor, highlightNotes, markMeasures, markSelected, markWarnings } from '../../lib/overlay'
 import { clearPatterns, drawPatterns } from '../../lib/patterns'
 import { renderPages, timeForNote } from '../../lib/verovio'
 import { useAnalysis } from '../../stores/analysis'
 import { useMidi } from '../../stores/midi'
+import { selectNote, useOmr } from '../../stores/omr'
 import { useScore } from '../../stores/score'
 import { useTransport } from '../../stores/transport'
 import './ScoreView.css'
@@ -26,6 +27,10 @@ export function ScoreView() {
   const analysis = useAnalysis((s) => s.analysis)
   const display = useAnalysis((s) => s.display)
   const selectedPattern = useAnalysis((s) => s.selectedPattern)
+  const reviewing = useOmr((s) => s.phase === 'review')
+  const omrWarnings = useOmr((s) => s.warnings)
+  const selectedNote = useOmr((s) => s.selectedId)
+  const measureIds = useScore((s) => s.measureIds)
   const events = useScore((s) => s.events)
   const leftHandIds = useRef(new Set<string>())
   useEffect(() => {
@@ -95,6 +100,14 @@ export function ScoreView() {
     else clearPatterns(el)
   }, [analysis, display.patterns, selectedPattern, pages])
 
+  // PDF review: flagged measures and the note selected for correction.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    markWarnings(el, reviewing ? omrWarnings : [], measureIds)
+    markSelected(el, reviewing ? selectedNote : null)
+  }, [reviewing, omrWarnings, selectedNote, measureIds, pages])
+
   // Follow-mode results: green measures without mistakes, red with.
   useEffect(() => {
     const el = containerRef.current
@@ -110,6 +123,10 @@ export function ScoreView() {
 
   const onClick = async (e: React.MouseEvent) => {
     const note = (e.target as Element).closest('g.note')
+    if (reviewing) {
+      selectNote(note?.id ?? null) // correcting: a click selects, it does not seek
+      return
+    }
     if (!note || !inTauri) return
     const ms = await timeForNote(note.id)
     if (ms !== null) await ipc.seek(ms)
@@ -121,8 +138,8 @@ export function ScoreView() {
         pages.map((svg, i) => <div key={i} className="score-page" dangerouslySetInnerHTML={{ __html: svg }} />)
       ) : (
         <div className="score-empty">
-          <p className="score-empty-title">Trascina qui un file MusicXML</p>
-          <p>.musicxml, .xml o .mxl — oppure usa «Apri…»</p>
+          <p className="score-empty-title">Trascina qui uno spartito</p>
+          <p>.musicxml, .xml, .mxl o un PDF da riconoscere — oppure usa «Apri…»</p>
         </div>
       )}
     </div>

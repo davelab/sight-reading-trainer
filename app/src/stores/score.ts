@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { MeasureOnset, MeasureStart, PlaybackEvent } from '../lib/timemap'
+import type { NoteRef } from '../types'
 
 export interface ScoreState {
   fileName: string | null
@@ -13,6 +14,8 @@ export interface ScoreState {
   measureLabels: string[]
   /** Measure xml:id by ordinal - 1. */
   measureIds: string[]
+  /** Verovio note id -> musical position (for corrections). */
+  noteRefs: Map<string, NoteRef>
   loading: boolean
   error: string | null
   /** Verovio scale in percent. */
@@ -30,6 +33,7 @@ export const useScore = create<ScoreState>((set) => ({
   onsets: new Map(),
   measureLabels: [],
   measureIds: [],
+  noteRefs: new Map(),
   loading: false,
   error: null,
   zoom: 40,

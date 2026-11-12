@@ -1,0 +1,82 @@
+.omr-card {
+  position: fixed;
+  right: 24px;
+  bottom: 140px;
+  z-index: 10;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
+}
+.omr-card progress {
+  width: 100%;
+}
+.omr-card button {
+  align-self: flex-end;
+}
+.omr-error {
+  color: var(--danger);
+}
+.omr-review-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome);
+}
+.omr-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.omr-hint,
+.omr-ok {
+  color: var(--text-secondary);
+}
+.omr-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.omr-actions .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.omr-selected {
+  min-width: 170px;
+  font-variant-numeric: tabular-nums;
+}
+.omr-tools {
+  display: flex;
+  gap: 4px;
+}
+.omr-tools button {
+  min-width: 34px;
+}
+.warning-chip {
+  border-color: #f08c00;
+  background: rgb(240 140 0 / 0.12);
+}
+.omr-pages {
+  width: 42%;
+  max-width: 720px;
+  overflow: auto;
+  padding: 16px;
+  background: var(--paper-bg);
+  border-right: 1px solid var(--border);
+}
+.omr-pages img {
+  display: block;
+  width: 100%;
+  margin-bottom: 16px;
+  background: white;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+}

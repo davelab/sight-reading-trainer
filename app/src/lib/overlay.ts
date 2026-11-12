@@ -86,3 +86,50 @@ export function markMeasures(root: ParentNode, marks: readonly MeasureMark[]): v
     measure.insertBefore(rect, measure.firstChild) // first child: drawn under the notes
   }
 }
+
+const WARN = 'omr-warning'
+
+/** Orange tint on the staves of measures flagged by the recognition check. */
+export function markWarnings(
+  root: ParentNode,
+  warnings: readonly { measure: number; staff?: number | null }[],
+  measureIds: readonly string[]
+): void {
+  root.querySelectorAll(`.${WARN}`).forEach((el) => el.remove())
+  for (const w of warnings) {
+    const id = measureIds[w.measure - 1]
+    const measure = id ? root.querySelector<SVGGElement>(`g.measure[id="${CSS.escape(id)}"]`) : null
+    if (!measure) continue
+    const staves = [...measure.querySelectorAll<SVGGraphicsElement>(':scope > g.staff')]
+    const chosen = w.staff ? staves.filter((_, i) => i === (w.staff as number) - 1) : staves
+    const target = chosen.length ? chosen : staves
+    const boxes = target.map((s) => s.getBBox())
+    if (!boxes.length) continue
+    const x = Math.min(...boxes.map((b) => b.x))
+    const y = Math.min(...boxes.map((b) => b.y))
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+    rect.setAttribute('class', WARN)
+    rect.setAttribute('x', String(x))
+    rect.setAttribute('y', String(y))
+    rect.setAttribute('width', String(Math.max(...boxes.map((b) => b.x + b.width)) - x))
+    rect.setAttribute('height', String(Math.max(...boxes.map((b) => b.y + b.height)) - y))
+    measure.insertBefore(rect, measure.firstChild)
+  }
+}
+
+/** Mark the note selected for correction. */
+export function markSelected(root: ParentNode, noteId: string | null): void {
+  root.querySelectorAll('.omr-selected').forEach((el) => el.classList.remove('omr-selected'))
+  if (noteId) root.querySelector(`[id="${CSS.escape(noteId)}"]`)?.classList.add('omr-selected')
+}
+
+/** Scroll a measure (by ordinal) into view and flash it. */
+export function revealMeasure(root: ParentNode, measureIds: readonly string[], ordinal: number): void {
+  const id = measureIds[ordinal - 1]
+  const el = id ? root.querySelector(`g.measure[id="${CSS.escape(id)}"]`) : null
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+  el.classList.remove('flash')
+  void (el as SVGElement).getBoundingClientRect()
+  el.classList.add('flash')
+}

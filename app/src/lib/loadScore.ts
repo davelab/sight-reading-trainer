@@ -1,12 +1,14 @@
 import { inTauri, ipc } from './ipc'
+import { buildNoteRefs } from './noteRefs'
 import { scoreDurationMs } from './timemap'
 import { loadScore } from './verovio'
-import { runAnalysis } from '../stores/analysis'
+import { runAnalysis, useAnalysis } from '../stores/analysis'
+import { startPdfImport } from '../stores/omr'
 import { useMidi } from '../stores/midi'
 import { useScore } from '../stores/score'
 import { useTransport } from '../stores/transport'
 
-export const SCORE_EXTENSIONS = ['musicxml', 'xml', 'mxl']
+export const SCORE_EXTENSIONS = ['musicxml', 'xml', 'mxl', 'pdf']
 
 export function isScoreFile(name: string): boolean {
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
@@ -18,7 +20,19 @@ function titleFromXml(xml: string): string | null {
   return m ? m[1].trim() : null
 }
 
-async function openMusicXml(fileName: string, musicxml: string, title: string | null): Promise<void> {
+export interface OpenOptions {
+  /** Run the harmonic analysis (not while a recognised score is being corrected). */
+  analyze?: boolean
+  /** Keep tempo, loop and position (re-rendering after a correction). */
+  keepTransport?: boolean
+}
+
+export async function openMusicXml(
+  fileName: string,
+  musicxml: string,
+  title: string | null,
+  { analyze = true, keepTransport = false }: OpenOptions = {}
+): Promise<void> {
   const score = useScore.getState()
   const { events, measures, onsets, measureLabels, measureIds } = await loadScore(musicxml)
   score.set({
@@ -30,11 +44,19 @@ async function openMusicXml(fileName: string, musicxml: string, title: string | 
     onsets,
     measureLabels,
     measureIds,
+    noteRefs: buildNoteRefs(onsets, measureIds, events),
     error: null
   })
-  void runAnalysis(musicxml) // in the background: the score is usable meanwhile
+  if (analyze) void runAnalysis(musicxml) // in the background: the score is usable meanwhile
+  else useAnalysis.setState({ analysis: null, status: 'idle', error: null, selectedPattern: null })
 
   const transport = useTransport.getState()
+  if (keepTransport && inTauri) {
+    transport.set({ loop: null, pendingLoopStart: null }) // loading clears the loop in Rust
+    await ipc.playbackLoad(events)
+    await Promise.all([ipc.setTempo(transport.tempoPercent), ipc.setHands(transport.hands)])
+    return
+  }
   transport.set({ playing: false, positionMs: 0, currentNoteIds: [], loop: null, pendingLoopStart: null })
   useMidi.getState().set({ following: false, expectedPitches: [], results: {} })
   if (!inTauri) {
@@ -58,10 +80,11 @@ async function withLoading(task: () => Promise<void>): Promise<void> {
   }
 }
 
-/** Open a file by path through the Rust core (Tauri only; handles .mxl). */
+/** Open a file by path through the Rust core (Tauri only; handles .mxl and PDF import). */
 export function openScorePath(path: string): Promise<void> {
+  if (path.toLowerCase().endsWith('.pdf')) return startPdfImport(path)
   return withLoading(async () => {
-    if (!isScoreFile(path)) throw new Error('Formato non supportato: usa .musicxml, .xml o .mxl')
+    if (!isScoreFile(path)) throw new Error('Formato non supportato: usa .musicxml, .xml, .mxl o .pdf')
     const file = await ipc.loadScore(path)
     await openMusicXml(file.fileName, file.musicxml, null)
   })

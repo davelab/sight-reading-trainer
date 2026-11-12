@@ -1,1 +1,1 @@
-export { OmrReview } from './OmrReview'
+export { OmrPages, OmrProgress, OmrReviewBar } from './OmrReview'

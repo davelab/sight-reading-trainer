@@ -5,7 +5,7 @@
  */
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { Analysis } from '../types'
+import type { Analysis, CheckResult, NoteRef, OmrProgress, OmrResult } from '../types'
 import type { PlaybackEvent } from './timemap'
 
 export type Hands = 'both' | 'right' | 'left'
@@ -73,7 +73,34 @@ export const ipc = {
   midiSelect: (name: string | null) => invoke<void>('midi_select', { name }),
   virtualNote: (pitch: number, on: boolean) => invoke<void>('virtual_note', { pitch, on }),
   /** Harmonic analysis by the Python engine (can take a few seconds). */
-  analyze: (musicxml: string) => invoke<Analysis>('analyze', { musicxml })
+  analyze: (musicxml: string) => invoke<Analysis>('analyze', { musicxml }),
+  /** Start recognising a PDF; progress and result arrive as omr:* events. */
+  importPdf: (path: string, pages?: number[]) => invoke<{ jobId: string }>('import_pdf', { path, pages }),
+  omrCancel: (jobId: string) => invoke<{ cancelled: boolean }>('omr_cancel', { jobId }),
+  scoreEdit: (musicxml: string, note: NoteRef, action: EditAction) =>
+    invoke<CheckResult>('score_edit', { musicxml, note, action }),
+  scoreCheck: (musicxml: string) => invoke<CheckResult>('score_check', { musicxml }),
+  saveTextFile: (path: string, contents: string) => invoke<void>('save_text_file', { path, contents })
+}
+
+export type EditAction = 'step-up' | 'step-down' | 'sharp' | 'flat' | 'natural' | 'delete'
+
+export interface OmrFailed {
+  jobId: string
+  message: string
+  cancelled: boolean
+}
+
+export function onOmrProgress(cb: (p: OmrProgress) => void): Promise<UnlistenFn> {
+  return listen<OmrProgress>('omr:progress', (e) => cb(e.payload))
+}
+
+export function onOmrDone(cb: (r: OmrResult) => void): Promise<UnlistenFn> {
+  return listen<OmrResult>('omr:done', (e) => cb(e.payload))
+}
+
+export function onOmrFailed(cb: (f: OmrFailed) => void): Promise<UnlistenFn> {
+  return listen<OmrFailed>('omr:failed', (e) => cb(e.payload))
 }
 
 export function onPlaybackPosition(cb: (p: PlaybackPosition) => void): Promise<UnlistenFn> {

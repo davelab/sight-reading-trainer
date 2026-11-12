@@ -3,14 +3,17 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { AnalysisPanel } from './components/AnalysisPanel'
 import { Keyboard } from './components/Keyboard'
 import { MidiPanel } from './components/MidiPanel'
+import { OmrPages, OmrProgress, OmrReviewBar } from './components/OmrReview'
 import { ScoreView } from './components/ScoreView'
 import { Transport } from './components/Transport'
 import { useFileDrop } from './hooks/useFileDrop'
 import { useMidiEvents } from './hooks/useMidiEvents'
+import { useOmrEvents } from './hooks/useOmrEvents'
 import { usePlaybackPosition } from './hooks/usePlaybackPosition'
 import { inTauri, ipc } from './lib/ipc'
 import { SCORE_EXTENSIONS, openScoreFile, openScorePath } from './lib/loadScore'
 import { useMidi } from './stores/midi'
+import { useOmr } from './stores/omr'
 import { useScore } from './stores/score'
 import { useTransport } from './stores/transport'
 
@@ -21,6 +24,8 @@ let initialFileRequested = false
 export default function App() {
   usePlaybackPosition()
   useMidiEvents()
+  useOmrEvents()
+  const reviewing = useOmr((s) => s.phase === 'review')
   const dropping = useFileDrop()
   const fileInput = useRef<HTMLInputElement>(null)
   const { title, loading, error, zoom, layout, set } = useScore()
@@ -53,7 +58,14 @@ export default function App() {
       fileInput.current?.click()
       return
     }
-    const path = await open({ multiple: false, filters: [{ name: 'MusicXML', extensions: SCORE_EXTENSIONS }] })
+    const path = await open({
+      multiple: false,
+      filters: [
+        { name: 'Spartiti (MusicXML o PDF)', extensions: SCORE_EXTENSIONS },
+        { name: 'MusicXML', extensions: SCORE_EXTENSIONS.filter((e) => e !== 'pdf') },
+        { name: 'PDF', extensions: ['pdf'] }
+      ]
+    })
     if (typeof path === 'string') await openScorePath(path)
   }
 
@@ -93,10 +105,12 @@ export default function App() {
           <button onClick={() => set({ error: null })}>✕</button>
         </div>
       )}
-      <AnalysisPanel />
+      {reviewing ? <OmrReviewBar /> : <AnalysisPanel />}
       <main className="main">
+        {reviewing && <OmrPages />}
         <ScoreView />
       </main>
+      <OmrProgress />
       <Keyboard />
       <Transport />
       {dropping && <div className="drop-overlay">Rilascia per aprire</div>}
