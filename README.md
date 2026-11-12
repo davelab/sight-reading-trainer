@@ -99,6 +99,7 @@ ancora. Tempi: 0,25 s per le 313 battute di un quartetto di Beethoven.
 | Secondo sidecar `omr` (homr, onnxruntime, OpenCV) separato dall'analisi; modelli (151 MB) scaricati una volta nella cartella dati dell'app | `scripts/build-engine.sh`, `src-tauri/src/engine.rs` |
 | Schermata di correzione: PDF originale a fianco, battute che non tornano evidenziate, clic su una nota → ↑ ↓ ♯ ♭ ♮ Elimina Annulla (anche da tastiera), «Salva MusicXML…» per MuseScore | `stores/omr.ts`, `io/correct.py` |
 | A fine correzione la partitura riconosciuta si analizza come le altre | `finishReview` |
+| Correzioni del ritmo: durata (7 6 5 4 3 2), punto, terzina sul gruppo (T) o su tutta la battuta (⇧T), inserisci nota (I), separa/unisci accordo (C), ottava (⇧↑/⇧↓), elimina togliendo il tempo (⇧⌫); le altre voci restano al loro posto | `io/rhythm.py`, `components/OmrReview` |
 
 **Criterio di uscita** («licenza OMR decisa; un PDF pulito diventa MusicXML
 correggibile»): licenza decisa (homr, AGPL-3.0). `engine/tests/test_omr.py`

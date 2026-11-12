@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { save } from '@tauri-apps/plugin-dialog'
-import { inTauri, ipc, onOmrDone, onOmrFailed, onOmrProgress, type EditAction } from '../lib/ipc'
+import { inTauri, ipc, onOmrDone, onOmrFailed, onOmrProgress, type EditAction, type NoteValue } from '../lib/ipc'
 import { openMusicXml } from '../lib/loadScore'
 import { findNote } from '../lib/noteRefs'
 import type { NoteRef, OmrProgress, OmrWarning } from '../types'
@@ -120,14 +120,15 @@ async function show(musicxml: string, reselect: NoteRef | null): Promise<void> {
   selectNote(id)
 }
 
-export async function correct(action: EditAction): Promise<void> {
+export async function correct(action: EditAction, value?: NoteValue): Promise<void> {
   const s = useOmr.getState()
   if (!s.musicxml || !s.selected || s.busy) return
   useOmr.setState({ busy: true, error: null })
   try {
-    const result = await ipc.scoreEdit(s.musicxml, s.selected, action)
+    const result = await ipc.scoreEdit(s.musicxml, s.selected, action, value)
     useOmr.setState({ musicxml: result.musicxml, warnings: result.warnings, history: [...s.history, s.musicxml] })
-    await show(result.musicxml, action === 'delete' ? null : s.selected)
+    // The engine tells where the edited (or inserted) note is now.
+    await show(result.musicxml, result.note ?? null)
   } catch (e) {
     useOmr.setState({ error: String(e) })
   } finally {

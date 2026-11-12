@@ -94,3 +94,13 @@ button.link {
   background: white;
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
 }
+.omr-label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  min-width: 42px;
+}
+.note-value {
+  font-size: 1.15rem;
+  line-height: 1;
+  font-family: 'Bravura Text', 'Noto Music', 'Apple Symbols', serif;
+}

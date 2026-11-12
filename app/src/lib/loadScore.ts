@@ -7,6 +7,7 @@ import { startPdfImport } from '../stores/omr'
 import { useMidi } from '../stores/midi'
 import { useScore } from '../stores/score'
 import { useTransport } from '../stores/transport'
+import { useView } from '../stores/view'
 
 export const SCORE_EXTENSIONS = ['musicxml', 'xml', 'mxl', 'pdf']
 
@@ -58,6 +59,8 @@ export async function openMusicXml(
     return
   }
   transport.set({ playing: false, positionMs: 0, currentNoteIds: [], loop: null, pendingLoopStart: null })
+  // A new piece starts in its written key; the other view settings stay as chosen.
+  if (useView.getState().transpose !== 0) useView.getState().set({ transpose: 0 })
   useMidi.getState().set({ following: false, expectedPitches: [], results: {} })
   if (!inTauri) {
     transport.set({ info: { durationMs: scoreDurationMs(events), synth: 'none', soundfontName: null } })

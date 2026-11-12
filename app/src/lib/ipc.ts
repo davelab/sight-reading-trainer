@@ -80,13 +80,31 @@ export const ipc = {
   /** Start recognising a PDF; progress and result arrive as omr:* events. */
   importPdf: (path: string, pages?: number[]) => invoke<{ jobId: string }>('import_pdf', { path, pages }),
   omrCancel: (jobId: string) => invoke<{ cancelled: boolean }>('omr_cancel', { jobId }),
-  scoreEdit: (musicxml: string, note: NoteRef, action: EditAction) =>
-    invoke<CheckResult>('score_edit', { musicxml, note, action }),
+  scoreEdit: (musicxml: string, note: NoteRef, action: EditAction, value?: NoteValue) =>
+    invoke<CheckResult>('score_edit', { musicxml, note, action, value: value ?? null }),
   scoreCheck: (musicxml: string) => invoke<CheckResult>('score_check', { musicxml }),
   saveTextFile: (path: string, contents: string) => invoke<void>('save_text_file', { path, contents })
 }
 
-export type EditAction = 'step-up' | 'step-down' | 'sharp' | 'flat' | 'natural' | 'delete'
+/** Mirrors EditAction in engine/score_engine/models.py. */
+export type EditAction =
+  | 'step-up'
+  | 'step-down'
+  | 'octave-up'
+  | 'octave-down'
+  | 'sharp'
+  | 'flat'
+  | 'natural'
+  | 'set-duration'
+  | 'toggle-dot'
+  | 'triplet'
+  | 'triplet-measure'
+  | 'insert-after'
+  | 'toggle-chord'
+  | 'delete'
+  | 'delete-time'
+
+export type NoteValue = 'whole' | 'half' | 'quarter' | 'eighth' | '16th' | '32nd'
 
 export interface OmrFailed {
   jobId: string

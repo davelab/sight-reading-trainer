@@ -277,10 +277,11 @@ pub async fn score_edit(
     musicxml: String,
     note: serde_json::Value,
     action: String,
+    value: Option<String>,
 ) -> CmdResult<serde_json::Value> {
     let client = state.analysis.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let params = serde_json::json!({ "musicxml": musicxml, "note": note, "action": action });
+        let params = serde_json::json!({ "musicxml": musicxml, "note": note, "action": action, "value": value });
         client.request("score.edit", params, Duration::from_secs(30))
     })
     .await
