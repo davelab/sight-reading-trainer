@@ -4,7 +4,17 @@
  */
 import createVerovioModule from 'verovio/wasm'
 import { VerovioToolkit } from 'verovio/esm'
-import { assignMeasures, buildPlaybackEvents, measureStarts, staffMapFromMei, type MeasureStart, type PlaybackEvent } from './timemap'
+import {
+  assignMeasures,
+  buildPlaybackEvents,
+  measureLabelsFromMei,
+  measureOnsets,
+  measureStarts,
+  staffMapFromMei,
+  type MeasureOnset,
+  type MeasureStart,
+  type PlaybackEvent
+} from './timemap'
 
 let toolkitPromise: Promise<VerovioToolkit> | null = null
 
@@ -17,11 +27,16 @@ export interface RenderOptions {
   widthPx: number
   /** Verovio scale in percent: the SVG is drawn at pageWidth × scale / 100 px. */
   scale: number
+  /** Minimal space between systems in MEI units (half staff spaces); Verovio's default is 4. */
+  spacingSystem?: number
 }
 
 export interface LoadedScore {
   events: PlaybackEvent[]
   measures: MeasureStart[]
+  onsets: Map<string, MeasureOnset[]>
+  /** Printed measure number by ordinal - 1. */
+  measureLabels: string[]
 }
 
 export async function loadScore(musicxml: string): Promise<LoadedScore> {
@@ -32,21 +47,22 @@ export async function loadScore(musicxml: string): Promise<LoadedScore> {
   }
   tk.renderToMIDI() // required before getMIDIValuesForElement
   const timemap = tk.renderToTimemap({ includeMeasures: true })
-  const staffs = staffMapFromMei(tk.getMEI())
+  const mei = tk.getMEI()
+  const staffs = staffMapFromMei(mei)
   const events = buildPlaybackEvents(timemap, (id) => {
     const midi = tk.getMIDIValuesForElement(id)
     if (!midi || typeof midi.pitch !== 'number') return null
     return { pitch: midi.pitch, durMs: midi.duration, staff: staffs.get(id) ?? 1 }
   })
   const measures = measureStarts(timemap)
-  return { events: assignMeasures(events, measures), measures }
+  return { events: assignMeasures(events, measures), measures, onsets: measureOnsets(timemap), measureLabels: measureLabelsFromMei(mei) }
 }
 
 /** Lay the loaded score out at the given width and return one SVG string per page. */
-export async function renderPages({ widthPx, scale }: RenderOptions): Promise<string[]> {
+export async function renderPages({ widthPx, scale, spacingSystem = 4 }: RenderOptions): Promise<string[]> {
   const tk = await getToolkit()
   const pageWidth = Math.max(800, Math.round((widthPx * 100) / scale))
-  tk.setOptions({ pageWidth, scale, pageMarginLeft: 50, pageMarginRight: 50, pageMarginTop: 50 })
+  tk.setOptions({ pageWidth, scale, spacingSystem, pageMarginLeft: 50, pageMarginRight: 50, pageMarginTop: 50 })
   tk.redoLayout()
   const pages: string[] = []
   for (let p = 1; p <= tk.getPageCount(); p++) pages.push(tk.renderToSVG(p))

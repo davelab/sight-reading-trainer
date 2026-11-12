@@ -5,6 +5,7 @@
  */
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import type { Analysis } from '../types'
 import type { PlaybackEvent } from './timemap'
 
 export type Hands = 'both' | 'right' | 'left'
@@ -70,7 +71,9 @@ export const ipc = {
   setFollowMode: (enabled: boolean) => invoke<boolean>('set_follow_mode', { enabled }),
   midiListDevices: () => invoke<MidiDevices>('midi_list_devices'),
   midiSelect: (name: string | null) => invoke<void>('midi_select', { name }),
-  virtualNote: (pitch: number, on: boolean) => invoke<void>('virtual_note', { pitch, on })
+  virtualNote: (pitch: number, on: boolean) => invoke<void>('virtual_note', { pitch, on }),
+  /** Harmonic analysis by the Python engine (can take a few seconds). */
+  analyze: (musicxml: string) => invoke<Analysis>('analyze', { musicxml })
 }
 
 export function onPlaybackPosition(cb: (p: PlaybackPosition) => void): Promise<UnlistenFn> {

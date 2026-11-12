@@ -1,6 +1,7 @@
 import { inTauri, ipc } from './ipc'
 import { scoreDurationMs } from './timemap'
 import { loadScore } from './verovio'
+import { runAnalysis } from '../stores/analysis'
 import { useMidi } from '../stores/midi'
 import { useScore } from '../stores/score'
 import { useTransport } from '../stores/transport'
@@ -19,8 +20,18 @@ function titleFromXml(xml: string): string | null {
 
 async function openMusicXml(fileName: string, musicxml: string, title: string | null): Promise<void> {
   const score = useScore.getState()
-  const { events, measures } = await loadScore(musicxml)
-  score.set({ fileName, title: title ?? titleFromXml(musicxml) ?? fileName, musicxml, events, measures, error: null })
+  const { events, measures, onsets, measureLabels } = await loadScore(musicxml)
+  score.set({
+    fileName,
+    title: title ?? titleFromXml(musicxml) ?? fileName,
+    musicxml,
+    events,
+    measures,
+    onsets,
+    measureLabels,
+    error: null
+  })
+  void runAnalysis(musicxml) // in the background: the score is usable meanwhile
 
   const transport = useTransport.getState()
   transport.set({ playing: false, positionMs: 0, currentNoteIds: [], loop: null, pendingLoopStart: null })

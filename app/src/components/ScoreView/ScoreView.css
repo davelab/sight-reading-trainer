@@ -12,6 +12,10 @@
 }
 .score-page svg {
   display: block;
+  overflow: visible; /* annotations below the last system */
+}
+.score-page {
+  padding-bottom: 24px;
 }
 .layout-pages .score-page {
   margin-bottom: 24px;
@@ -52,4 +56,28 @@
 .score-view rect.follow-mark.err {
   fill: var(--err);
   fill-opacity: 0.16;
+}
+/* Harmonic analysis. */
+.score-view text.analysis-mark {
+  font-family: 'Times New Roman', Times, serif;
+  fill: #333;
+  pointer-events: none;
+}
+.score-view text.analysis-mark.symbol {
+  font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+  fill: #555;
+}
+.score-view text.analysis-mark .key {
+  font-weight: 700;
+  fill: #111;
+}
+.score-view text.fn-tonic {
+  fill: var(--fn-tonic);
+}
+.score-view text.fn-predominant {
+  fill: var(--fn-predominant);
+}
+.score-view text.fn-dominant {
+  fill: var(--fn-dominant);
 }

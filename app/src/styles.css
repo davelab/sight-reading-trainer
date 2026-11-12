@@ -9,6 +9,10 @@
   --accent: #3a64d8;
   --cursor: #e0a800;
   --ok: #2e9b57;
+  /* Harmonic functions, on the white score page in both themes. */
+  --fn-tonic: #1f5fbf;
+  --fn-predominant: #2a8a3e;
+  --fn-dominant: #c2410c;
   --err: #d23c2f;
   --danger-bg: #fbe3e1;
   --danger: #a3261b;

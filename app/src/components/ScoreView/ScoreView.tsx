@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { inTauri, ipc } from '../../lib/ipc'
+import { drawAnalysis, systemSpacingFor } from '../../lib/analysisOverlay'
 import { followCursor, highlightNotes, markMeasures } from '../../lib/overlay'
 import { renderPages, timeForNote } from '../../lib/verovio'
+import { useAnalysis } from '../../stores/analysis'
 import { useMidi } from '../../stores/midi'
 import { useScore } from '../../stores/score'
 import { useTransport } from '../../stores/transport'
@@ -19,7 +21,11 @@ export function ScoreView() {
   const following = useMidi((s) => s.following)
   const results = useMidi((s) => s.results)
   const measures = useScore((s) => s.measures)
+  const onsets = useScore((s) => s.onsets)
+  const analysis = useAnalysis((s) => s.analysis)
+  const display = useAnalysis((s) => s.display)
   const [width, setWidth] = useState(0)
+  const spacingSystem = useAnalysis((s) => systemSpacingFor(s.display, s.analysis !== null))
   const [pages, setPages] = useState<string[]>([])
 
   // Track the container width, debounced, so the layout follows the window.
@@ -41,13 +47,13 @@ export function ScoreView() {
   useEffect(() => {
     if (!musicxml || width === 0) return
     let cancelled = false
-    void renderPages({ widthPx: width - 32, scale: zoom }).then((svgs) => {
+    void renderPages({ widthPx: width - 32, scale: zoom, spacingSystem }).then((svgs) => {
       if (!cancelled) setPages(svgs)
     })
     return () => {
       cancelled = true
     }
-  }, [musicxml, width, zoom])
+  }, [musicxml, width, zoom, spacingSystem])
 
   // After every render, re-apply the highlight to the fresh SVG.
   useEffect(() => {
@@ -64,6 +70,14 @@ export function ScoreView() {
     highlighted.current = highlightNotes(el, highlighted.current, currentNoteIds)
     if (playing || following) followCursor(el, currentNoteIds[0])
   }, [currentNoteIds, playing, following])
+
+  // Harmonic analysis: symbols above, roman numerals below, anchored to (measure, offset).
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !analysis) return
+    drawAnalysis(el, analysis, onsets, display)
+    return () => drawAnalysis(el, { chords: [] }, onsets, display)
+  }, [analysis, display, onsets, pages])
 
   // Follow-mode results: green measures without mistakes, red with.
   useEffect(() => {

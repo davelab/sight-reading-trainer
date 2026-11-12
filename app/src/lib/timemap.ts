@@ -70,6 +70,11 @@ export function staffMapFromMei(mei: string): Map<string, number> {
   return map
 }
 
+/** Printed number of every measure ("7", "7a"...) in document order, from Verovio's MEI. */
+export function measureLabelsFromMei(mei: string): string[] {
+  return [...mei.matchAll(/<measure\b([^>]*)>/g)].map((m, i) => /\bn="([^"]+)"/.exec(m[1])?.[1] ?? String(i + 1))
+}
+
 export interface MeasureStart {
   measureId: string
   /** 1-based index in performance order. */
@@ -99,6 +104,32 @@ export function assignMeasures(events: PlaybackEvent[], measures: MeasureStart[]
     e.measure = lo > 0 ? measures[lo - 1].index : 0
   }
   return events
+}
+
+/** Note onsets inside one measure: `q` in quarter notes from the downbeat. */
+export interface MeasureOnset {
+  q: number
+  noteIds: string[]
+}
+
+/**
+ * Group the timemap's note onsets by measure, positions relative to the
+ * measure start. Used to place annotations anchored to (measure, offset).
+ * With repeats only the first pass of each measure is kept.
+ */
+export function measureOnsets(timemap: TimeMapEntry[]): Map<string, MeasureOnset[]> {
+  const out = new Map<string, MeasureOnset[]>()
+  let current: { id: string; start: number; list: MeasureOnset[] } | null = null
+  for (const entry of timemap) {
+    const q = entry.qstamp ?? (entry.qfrac ? entry.qfrac[0] / entry.qfrac[1] : 0)
+    if (entry.measureOn) {
+      const seen = out.has(entry.measureOn)
+      current = seen ? null : { id: entry.measureOn, start: q, list: [] }
+      if (current) out.set(current.id, current.list)
+    }
+    if (current && entry.on?.length) current.list.push({ q: q - current.start, noteIds: [...entry.on] })
+  }
+  return out
 }
 
 export function scoreDurationMs(events: PlaybackEvent[]): number {

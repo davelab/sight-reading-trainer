@@ -1,0 +1,61 @@
+.analysis-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome);
+  font-size: 0.9rem;
+}
+.analysis-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.key-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.key-chip .range,
+.analysis-status {
+  color: var(--text-secondary);
+}
+.analysis-status.error {
+  color: var(--danger);
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.analysis-switches {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.analysis-switches label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.fn-legend {
+  display: inline-flex;
+  gap: 6px;
+  font-family: 'Times New Roman', Times, serif;
+  font-weight: 700;
+  font-style: normal;
+}
+.fn-legend i {
+  font-style: normal;
+}
+.fn-legend .fn-tonic {
+  color: var(--fn-tonic);
+}
+.fn-legend .fn-predominant {
+  color: var(--fn-predominant);
+}
+.fn-legend .fn-dominant {
+  color: var(--fn-dominant);
+}

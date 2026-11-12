@@ -93,9 +93,9 @@ export default function App() {
           <button onClick={() => set({ error: null })}>✕</button>
         </div>
       )}
+      <AnalysisPanel />
       <main className="main">
         <ScoreView />
-        <AnalysisPanel />
       </main>
       <Keyboard />
       <Transport />

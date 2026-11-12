@@ -4,7 +4,15 @@ import { describe, expect, it } from 'vitest'
 import createVerovioModule from 'verovio/wasm'
 import { VerovioToolkit } from 'verovio/esm'
 import type { TimeMapEntry } from 'verovio'
-import { assignMeasures, buildPlaybackEvents, measureStarts, scoreDurationMs, staffMapFromMei } from './timemap'
+import {
+  assignMeasures,
+  buildPlaybackEvents,
+  measureLabelsFromMei,
+  measureOnsets,
+  measureStarts,
+  scoreDurationMs,
+  staffMapFromMei
+} from './timemap'
 
 const FIXTURE = fileURLToPath(new URL('../../../engine/tests/fixtures/minuet-in-g.musicxml', import.meta.url))
 
@@ -44,6 +52,31 @@ describe('assignMeasures', () => {
     ]
     const ev = (onsetMs: number) => ({ noteId: String(onsetMs), pitch: 60, onsetMs, durMs: 1, velocity: 80, staff: 1, measure: 0 })
     expect(assignMeasures([ev(0), ev(1498), ev(1499.5), ev(3000)], measures).map((e) => e.measure)).toEqual([1, 1, 2, 2])
+  })
+})
+
+describe('measureOnsets', () => {
+  it('groups onsets per measure relative to the downbeat, first pass only', () => {
+    const tm: TimeMapEntry[] = [
+      { tstamp: 0, qstamp: 0, measureOn: 'm1', on: ['a'] },
+      { tstamp: 500, qstamp: 1, on: ['b', 'c'] },
+      { tstamp: 1500, qstamp: 3, measureOn: 'm2', on: ['d'] },
+      { tstamp: 2000, qstamp: 4, off: ['d'] },
+      { tstamp: 3000, qstamp: 6, measureOn: 'm1', on: ['a'] } // repeat
+    ]
+    const m = measureOnsets(tm)
+    expect(m.get('m1')).toEqual([
+      { q: 0, noteIds: ['a'] },
+      { q: 1, noteIds: ['b', 'c'] }
+    ])
+    expect(m.get('m2')).toEqual([{ q: 0, noteIds: ['d'] }])
+  })
+})
+
+describe('measureLabelsFromMei', () => {
+  it('reads printed numbers in document order', () => {
+    const mei = '<section><measure xml:id="a" n="0"/><measure n="7" xml:id="b"><staff n="1"/></measure><measure xml:id="c"/></section>'
+    expect(measureLabelsFromMei(mei)).toEqual(['0', '7', '3'])
   })
 })
 

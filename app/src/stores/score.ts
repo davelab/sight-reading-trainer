@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { MeasureStart, PlaybackEvent } from '../lib/timemap'
+import type { MeasureOnset, MeasureStart, PlaybackEvent } from '../lib/timemap'
 
 export interface ScoreState {
   fileName: string | null
@@ -7,6 +7,10 @@ export interface ScoreState {
   musicxml: string | null
   events: PlaybackEvent[]
   measures: MeasureStart[]
+  /** Note onsets per measure id, for annotations anchored to (measure, offset). */
+  onsets: Map<string, MeasureOnset[]>
+  /** Printed measure number by ordinal - 1 (annotations use ordinals). */
+  measureLabels: string[]
   loading: boolean
   error: string | null
   /** Verovio scale in percent. */
@@ -21,6 +25,8 @@ export const useScore = create<ScoreState>((set) => ({
   musicxml: null,
   events: [],
   measures: [],
+  onsets: new Map(),
+  measureLabels: [],
   loading: false,
   error: null,
   zoom: 40,
