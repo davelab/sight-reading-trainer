@@ -123,6 +123,19 @@ diesis persi) vanno viste confrontando con il PDF.
 | **Lettura anticipata**: copre la battuta che stai suonando (o anche la successiva), così gli occhi devono stare avanti | `lib/practiceOverlay.ts` |
 | **Aiuti da togliere gradualmente** (⚙︎ → Lettura a prima vista; preset Tutti / Senza nomi / Nessuno): nomi delle note, salti della melodia dalla terza in su (3↑, 5↓), forme degli accordi (fond., 1°/2° rivolto, 7ª) | `lib/practiceOverlay.ts`, `lib/practice.ts` |
 
+### Esercizi (vista «Esercizi»)
+
+Esercizi brevi col piano collegato (o la tastiera a schermo), con record per
+impostazione:
+
+| Esercizio | Cosa fa |
+|---|---|
+| **Lettura note** | Compare una nota, la suoni: note al minuto, tempo medio, % al primo colpo, le più lente. Chiave di violino/basso/entrambe; dentro il pentagramma, solo tagli addizionali o tutto; con o senza alterazioni; ottava esatta o libera; 1, 2 o 5 minuti |
+| **Intervalli e accordi** | Un intervallo (2ª–8ª) o una triade maggiore/minore in qualsiasi rivolto: suoni tutte le note insieme; dopo vedi il nome («3ª minore», «Re maggiore, 1° rivolto») |
+| **Ritmo** | Due battute di ritmo in 5 livelli (fino a semicrome e terzine) al tempo scelto: conteggio, metronomo, batti su un tasto qualsiasi; ogni nota si colora (a tempo, anticipo/ritardo, mancata). Usa la modalità «A tempo» di Rust (qualsiasi tasto); poi la partitura torna nel trasporto |
+
+Codice: `lib/drills.ts` (generatori, verifica, statistiche), `components/Drills`.
+
 ### Etichette degli accordi (impostazione)
 
 Nel pannello dell'analisi: «Accordi» mostra o nasconde la riga sotto ogni

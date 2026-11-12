@@ -5,7 +5,7 @@ import { create } from 'zustand'
  * (localStorage, per this computer only).
  */
 export interface ViewSettings {
-  mode: 'score' | 'falling' | 'both'
+  mode: 'score' | 'falling' | 'both' | 'drills'
   showChords: boolean
   showNoteNames: boolean
   showKeyNames: boolean

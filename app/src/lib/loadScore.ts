@@ -96,6 +96,24 @@ export async function openMusicXml(
   transport.set({ info })
 }
 
+/**
+ * Give the open score back to the Rust core after a drill borrowed the transport:
+ * its notes, tempo, hands, beats and the metronome switch.
+ */
+export async function restorePlayback(): Promise<void> {
+  if (!inTauri) return
+  const { events } = useScore.getState()
+  const transport = useTransport.getState()
+  await ipc.playbackLoad(events)
+  await Promise.all([
+    ipc.setTempo(transport.tempoPercent),
+    ipc.setHands(transport.hands),
+    ipc.setLoop(null),
+    sendClicks()
+  ])
+  transport.set({ loop: null, pendingLoopStart: null, positionMs: 0 })
+}
+
 /** Metronome beats of the loaded score, and the metronome switch, to the Rust core. */
 async function sendClicks(): Promise<void> {
   const { measures, measureIds, meters, events } = useScore.getState()

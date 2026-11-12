@@ -20,11 +20,41 @@ import {
 } from './timemap'
 import { metersFromMei, spellingsFromMei, type Meter, type Spelling } from './practice'
 
+let modulePromise: ReturnType<typeof createVerovioModule> | null = null
 let toolkitPromise: Promise<VerovioToolkit> | null = null
+let drillToolkitPromise: Promise<VerovioToolkit> | null = null
+
+function getModule(): ReturnType<typeof createVerovioModule> {
+  modulePromise ??= createVerovioModule()
+  return modulePromise
+}
 
 export function getToolkit(): Promise<VerovioToolkit> {
-  toolkitPromise ??= createVerovioModule().then((module) => new VerovioToolkit(module))
+  toolkitPromise ??= getModule().then((module) => new VerovioToolkit(module))
   return toolkitPromise
+}
+
+/**
+ * Render a small standalone MusicXML (a drill question) to one SVG, with its own
+ * toolkit: the score loaded in the main one is left alone.
+ */
+export async function renderSnippet(musicxml: string, scale = 90, pageWidth = 1400): Promise<string> {
+  drillToolkitPromise ??= getModule().then((module) => new VerovioToolkit(module))
+  const tk = await drillToolkitPromise
+  tk.setOptions({
+    scale,
+    pageWidth,
+    adjustPageHeight: true,
+    adjustPageWidth: true,
+    header: 'none',
+    footer: 'none',
+    pageMarginTop: 20,
+    pageMarginBottom: 20,
+    pageMarginLeft: 20,
+    pageMarginRight: 20
+  })
+  if (!tk.loadData(musicxml)) throw new Error('esercizio non disegnabile')
+  return tk.renderToSVG(1)
 }
 
 export interface RenderOptions {

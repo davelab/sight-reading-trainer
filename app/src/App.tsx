@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { AnalysisPanel } from './components/AnalysisPanel'
 import { ClaudeKeyDialog } from './components/ClaudeKey'
+import { DrillView } from './components/Drills'
 import { TimedSummaryCard } from './components/Practice'
 import { FallingNotes } from './components/FallingNotes'
 import { Keyboard } from './components/Keyboard'
@@ -160,7 +161,8 @@ export default function App() {
             [
               ['score', 'Partitura'],
               ['falling', 'Note cadenti'],
-              ['both', 'Entrambe']
+              ['both', 'Entrambe'],
+              ['drills', 'Esercizi']
             ] as const
           ).map(([value, label]) => (
             <button key={value} className={mode === value ? 'selected' : ''} onClick={() => setView({ mode: value })}>
@@ -188,18 +190,22 @@ export default function App() {
           <button onClick={() => set({ error: null })}>✕</button>
         </div>
       )}
-      {reviewing ? <OmrReviewBar /> : <AnalysisPanel />}
-      <main className={`main view-${reviewing ? 'score' : mode}`}>
-        {reviewing && <OmrPages />}
-        {(reviewing || mode !== 'falling') && <ScoreView />}
-        {!reviewing && mode !== 'score' && (
-          <div className="falling-pane">
-            <FallingNotes />
-          </div>
-        )}
-      </main>
+      {reviewing ? <OmrReviewBar /> : mode !== 'drills' && <AnalysisPanel />}
+      {!reviewing && mode === 'drills' ? (
+        <DrillView />
+      ) : (
+        <main className={`main view-${reviewing ? 'score' : mode}`}>
+          {reviewing && <OmrPages />}
+          {(reviewing || mode !== 'falling') && <ScoreView />}
+          {!reviewing && mode !== 'score' && (
+            <div className="falling-pane">
+              <FallingNotes />
+            </div>
+          )}
+        </main>
+      )}
       <OmrProgress />
-      <TimedSummaryCard />
+      {mode !== 'drills' && <TimedSummaryCard />}
       <TranscribeSetup />
       <ClaudeKeyDialog />
       <Keyboard />

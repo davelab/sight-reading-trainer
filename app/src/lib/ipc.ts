@@ -131,8 +131,8 @@ export const ipc = {
   setClicks: (clicks: { ms: number; accent: boolean }[]) => invoke<void>('set_clicks', { clicks }),
   setMetronome: (enabled: boolean) => invoke<void>('set_metronome', { enabled }),
   /** "A tempo" mode from the current position; results arrive as timed:* events. */
-  startTimedMode: (toleranceMs: number, countIn: { beats: number; beatMs: number } | null) =>
-    invoke<void>('start_timed_mode', { toleranceMs, countIn }),
+  startTimedMode: (toleranceMs: number, countIn: { beats: number; beatMs: number } | null, anyKey = false) =>
+    invoke<void>('start_timed_mode', { toleranceMs, countIn, anyKey }),
   stopTimedMode: () => invoke<void>('stop_timed_mode'),
   /** Start transcribing a piano recording; progress and result arrive as transcribe:* events. */
   transcribeAudio: (path: string, hints: TranscribeHints = {}) =>
@@ -200,6 +200,17 @@ export function onMidiNote(cb: (n: MidiNote) => void): Promise<UnlistenFn> {
 
 export function onTimedResult(cb: (r: TimedResult) => void): Promise<UnlistenFn> {
   return listen<TimedResult>('timed:result', (e) => cb(e.payload))
+}
+
+/** "A tempo" verdicts note by note (onset in score ms). */
+export interface NoteJudgement {
+  onsetMs: number
+  verdict: 'correct' | 'early' | 'late' | 'missed'
+  offsetMs: number
+}
+
+export function onTimedNotes(cb: (notes: NoteJudgement[]) => void): Promise<UnlistenFn> {
+  return listen<NoteJudgement[]>('timed:notes', (e) => cb(e.payload))
 }
 
 export function onTimedSummary(cb: (s: TimedSummary) => void): Promise<UnlistenFn> {
