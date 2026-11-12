@@ -73,8 +73,46 @@ Prossime: M4 (pattern), M5 (OMR), M6 (packaging). Vedi la roadmap in `docs/SPEC.
 
 ## Requisiti
 
-- macOS 11+ (Apple Silicon o Intel), Xcode Command Line Tools
+- macOS 10.15 Catalina o successivo (Apple Silicon o Intel), Xcode Command Line Tools
 - Rust stabile (`rustup`), Node 20+ con pnpm, [uv](https://docs.astral.sh/uv/) (Python 3.12)
+
+## Installazione su Mac (compilando dai sorgenti)
+
+Non c'è ancora un pacchetto firmato (arriva con M6): l'app si compila sul Mac
+stesso, e un'app compilata in locale si apre senza blocchi di Gatekeeper.
+
+1. Strumenti, nel Terminale (una volta sola; chiudi e riapri il Terminale dopo):
+
+   ```sh
+   xcode-select --install
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+   Node: installer «LTS» da nodejs.org (Node 22 su macOS 11+, Node 20 su
+   Catalina), poi `corepack enable pnpm`.
+
+2. Codice e SoundFont:
+
+   ```sh
+   git clone https://github.com/davelab/sight-reading-trainer.git
+   cd sight-reading-trainer
+   scripts/fetch-soundfont.sh
+   ```
+
+3. Compilazione (la prima volta 10–25 minuti; su Intel produce un'app x86_64):
+
+   ```sh
+   cd app
+   pnpm install
+   pnpm bundle --bundles app
+   ```
+
+4. L'app è in `app/src-tauri/target/release/bundle/macos/Score Studio.app`:
+   trascinala in Applicazioni. Se macOS dice che non può aprirla, clic destro →
+   Apri → Apri.
+
+Per aggiornare: `git pull`, poi ripeti il passo 3.
 
 ## Avvio
 
