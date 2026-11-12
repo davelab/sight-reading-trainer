@@ -117,7 +117,14 @@ class NoteRef(_Model):
     pitch: int = Field(ge=0, le=127, description="MIDI pitch")
 
 
-EditAction = Literal["step-up", "step-down", "sharp", "flat", "natural", "delete"]
+EditAction = Literal[
+    # pitch
+    "step-up", "step-down", "octave-up", "octave-down", "sharp", "flat", "natural",
+    # rhythm (set-duration takes `value`: whole, half, quarter, eighth, 16th, 32nd, 64th)
+    "set-duration", "toggle-dot", "triplet", "triplet-measure",
+    # structure
+    "insert-after", "toggle-chord", "delete", "delete-time",
+]  # fmt: skip
 
 
 class OmrWarning(_Model):
@@ -132,6 +139,9 @@ class CheckResult(_Model):
 
     musicxml: str
     warnings: list[OmrWarning]
+    note: NoteRef | None = Field(
+        default=None, description="score.edit: where the edited (or inserted) note is now"
+    )
 
 
 class OmrResult(_Model):

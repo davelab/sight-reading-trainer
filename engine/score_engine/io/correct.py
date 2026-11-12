@@ -111,27 +111,69 @@ def _delete(walked: WalkedNote, notes: list[WalkedNote]) -> None:
     note.insert(first, rest)
 
 
-def apply_edit(musicxml: str, ref: NoteRef, action: EditAction) -> str:
+def edit(
+    musicxml: str, ref: NoteRef, action: EditAction, value: str | None = None
+) -> tuple[str, NoteRef | None]:
+    """Apply one correction; return the new MusicXML and where the edited note now is."""
+    from . import rhythm
+
     root = _parse(musicxml)
     notes, _ = walk(root)
     target = find_note(notes, ref)
+    voice_key = (target.measure_el, target.ref.staff, target.voice)
+    try:
+        if action in ("step-up", "step-down", "sharp", "flat", "natural", "delete"):
+            result: ET.Element | None = target.el
+            _pitch_edit(root, notes, target, action)
+            if action == "delete":
+                result = target.el
+        elif action == "octave-up":
+            result = rhythm.octave(target, 1)
+        elif action == "octave-down":
+            result = rhythm.octave(target, -1)
+        elif action == "set-duration":
+            result = rhythm.set_type(target, value or "")
+        elif action == "toggle-dot":
+            result = rhythm.toggle_dot(target)
+        elif action == "triplet":
+            result = rhythm.triplets(target, whole_measure=False)
+        elif action == "triplet-measure":
+            result = rhythm.triplets(target, whole_measure=True)
+        elif action == "insert-after":
+            result = rhythm.insert_after(target)
+        elif action == "toggle-chord":
+            result = rhythm.toggle_chord(target)
+        elif action == "delete-time":
+            result = rhythm.delete_with_time(target)
+        else:
+            raise EditError(f"azione sconosciuta: {action}")
+    except rhythm.RhythmError as e:
+        raise EditError(str(e)) from e
+
+    # Re-beam the voice: its notes may have moved, changed value or gone.
+    for n in walk(root)[0]:
+        if (n.measure_el, n.ref.staff, n.voice) == voice_key:
+            for beam in n.el.findall("beam"):
+                n.el.remove(beam)
+    new_ref = (
+        next((n.ref for n in walk(root)[0] if n.el is result), None) if result is not None else None
+    )
+    from ..omr.beams import add_beams
+
+    return add_beams(_serialize(root)), new_ref
+
+
+def apply_edit(musicxml: str, ref: NoteRef, action: EditAction, value: str | None = None) -> str:
+    return edit(musicxml, ref, action, value)[0]
+
+
+def _pitch_edit(root: ET.Element, notes: list[WalkedNote], target: WalkedNote, action: str) -> None:
     note = target.el
     if action == "delete":
         # Drop the voice's beams and beam it again: removing a note from a
         # beamed group must not leave a beam without its end.
-        for n in notes:
-            same_voice = (n.measure_el, n.ref.staff, n.voice) == (
-                target.measure_el,
-                target.ref.staff,
-                target.voice,
-            )
-            if same_voice:
-                for beam in n.el.findall("beam"):
-                    n.el.remove(beam)
         _delete(target, notes)
-        from ..omr.beams import add_beams
-
-        return add_beams(_serialize(root))
+        return
     pitch = note.find("pitch")
     if pitch is None:
         raise EditError("si possono modificare solo le note, non le pause")
@@ -153,7 +195,6 @@ def apply_edit(musicxml: str, ref: NoteRef, action: EditAction) -> str:
         raise EditError(f"azione sconosciuta: {action}")
     _set_pitch(note, step, octave, alter, target.fifths)
     assert midi_of(note) == 12 * (octave + 1) + STEP_PC[step] + alter
-    return _serialize(root)
 
 
 def _fmt(quarters: Fraction, beat_type: int) -> str:

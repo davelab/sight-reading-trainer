@@ -105,13 +105,27 @@ def score_edit(params: dict[str, Any]) -> CheckResult:
 
     from .io.xml_walk import NoteRef as Ref
 
+    value = params.get("value")
+    if value is not None and not isinstance(value, str):
+        raise RpcError(INVALID_PARAMS, "value must be a string")
     try:
-        edited = correct.apply_edit(
+        edited, moved = correct.edit(
             musicxml,
             Ref(ref.measure, ref.staff, Fraction(ref.offset).limit_denominator(96), ref.pitch),
             action,
+            value,
         )
-        return CheckResult(musicxml=edited, warnings=correct.check(edited))
+        note = (
+            NoteRef(
+                measure=moved.measure,
+                staff=moved.staff,
+                offset=float(moved.offset),
+                pitch=moved.midi,
+            )
+            if moved is not None and moved.midi is not None
+            else None
+        )
+        return CheckResult(musicxml=edited, warnings=correct.check(edited), note=note)
     except correct.EditError as e:
         raise RpcError(INVALID_PARAMS, str(e)) from e
 

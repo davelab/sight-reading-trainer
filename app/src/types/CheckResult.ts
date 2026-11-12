@@ -6,6 +6,10 @@
 export interface CheckResult {
   musicxml: string;
   warnings: OmrWarning[];
+  /**
+   * score.edit: where the edited (or inserted) note is now
+   */
+  note?: NoteRef | null;
 }
 /**
  * This interface was referenced by `CheckResult`'s JSON-Schema
@@ -16,4 +20,28 @@ export interface OmrWarning {
   staff?: number | null;
   kind: "duration" | "page";
   message: string;
+}
+/**
+ * A note found by position (never by ID): what the review screen sends to edit.
+ *
+ * This interface was referenced by `CheckResult`'s JSON-Schema
+ * via the `definition` "NoteRef".
+ */
+export interface NoteRef {
+  /**
+   * Measure ordinal in the written score
+   */
+  measure: number;
+  /**
+   * Global staff number: staves of all parts in order
+   */
+  staff: number;
+  /**
+   * Onset in quarter notes from the downbeat
+   */
+  offset: number;
+  /**
+   * MIDI pitch
+   */
+  pitch: number;
 }

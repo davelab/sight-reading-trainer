@@ -33,6 +33,7 @@ class WalkedNote:
     voice: str
     is_chord_member: bool  # has <chord/>: shares the onset of the previous note
     fifths: int  # key signature in force
+    divisions: int = 1  # of the part, where this note is
 
 
 @dataclass
@@ -111,6 +112,7 @@ def walk(root: ET.Element) -> tuple[list[WalkedNote], list[MeasureInfo]]:
                         voice=el.findtext("voice", "1"),
                         is_chord_member=is_chord,
                         fifths=fifths,
+                        divisions=divisions,
                     )
                 )
                 info.filled[staff] = max(info.filled.get(staff, Fraction(0)), onset + dur)
