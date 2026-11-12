@@ -54,6 +54,18 @@ impl TimedResult {
     }
 }
 
+/// The verdict on one expected note, for drills that show it note by note.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteJudgement {
+    /// Onset of the expected note (score ms): identifies it.
+    pub onset_ms: f64,
+    /// "correct", "early", "late" or "missed".
+    pub verdict: &'static str,
+    /// How far from its time it was played, in real ms (0 when missed).
+    pub offset_ms: f64,
+}
+
 /// Totals of a run, sent when the music ends or the player stops.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -87,6 +99,9 @@ pub struct Timed {
     measures_done: u32,
     offsets_ms: Vec<f64>,
     last_position: f64,
+    /// Rhythm drills: any key counts, only the timing is judged.
+    any_key: bool,
+    judged: Vec<NoteJudgement>,
 }
 
 impl Timed {
@@ -114,7 +129,15 @@ impl Timed {
 
     /// Start judging from `from_ms`, with an on-time tolerance of `tolerance_real_ms`
     /// at tempo factor `rate`.
+    #[cfg(test)]
     pub fn start(&mut self, from_ms: f64, tolerance_real_ms: f64, rate: f64) {
+        self.start_with(from_ms, tolerance_real_ms, rate, false);
+    }
+
+    /// As [`Timed::start`]; with `any_key` every key counts for any note (rhythm only).
+    pub fn start_with(&mut self, from_ms: f64, tolerance_real_ms: f64, rate: f64, any_key: bool) {
+        self.any_key = any_key;
+        self.judged.clear();
         self.active = true;
         self.rate = rate.max(0.01);
         self.tolerance = tolerance_real_ms.max(10.0) * self.rate;
@@ -186,7 +209,7 @@ impl Timed {
             .expected
             .iter()
             .enumerate()
-            .filter(|(_, e)| e.state == State::Pending && e.pitch == pitch)
+            .filter(|(_, e)| e.state == State::Pending && (self.any_key || e.pitch == pitch))
             .filter(|(_, e)| (e.onset_ms - position).abs() <= window)
             .min_by(|(_, a), (_, b)| (a.onset_ms - position).abs().total_cmp(&(b.onset_ms - position).abs()))
             .map(|(i, _)| i);
@@ -197,13 +220,19 @@ impl Timed {
                 let offset = position - onset;
                 self.offsets_ms.push(offset / self.rate);
                 let tolerance = self.tolerance;
-                let r = self.result_for(measure);
-                if offset.abs() <= tolerance {
-                    r.correct += 1;
+                let verdict = if offset.abs() <= tolerance {
+                    "correct"
                 } else if offset < 0.0 {
-                    r.early += 1;
+                    "early"
                 } else {
-                    r.late += 1;
+                    "late"
+                };
+                self.judged.push(NoteJudgement { onset_ms: onset, verdict, offset_ms: offset / self.rate });
+                let r = self.result_for(measure);
+                match verdict {
+                    "correct" => r.correct += 1,
+                    "early" => r.early += 1,
+                    _ => r.late += 1,
                 }
             }
             None => {
@@ -231,6 +260,7 @@ impl Timed {
             if e.state == State::Pending && e.onset_ms + window < position {
                 e.state = State::Missed;
                 missed.push(e.measure);
+                self.judged.push(NoteJudgement { onset_ms: e.onset_ms, verdict: "missed", offset_ms: 0.0 });
             }
         }
         for m in missed {
@@ -253,6 +283,11 @@ impl Timed {
             }
         }
         done
+    }
+
+    /// Note verdicts since the last call (chords give one per note).
+    pub fn drain_judged(&mut self) -> Vec<NoteJudgement> {
+        std::mem::take(&mut self.judged)
     }
 
     fn summary(&self) -> TimedSummary {
@@ -377,6 +412,22 @@ mod tests {
         t.note_on(64, 520.0);
         assert_eq!(t.tick(999.0)[0].correct, 2);
         assert_eq!(t.stop().expect("running").correct, 4);
+    }
+
+    #[test]
+    fn any_key_judges_only_the_timing() {
+        let mut t = timed();
+        t.start_with(0.0, 100.0, 1.0, true);
+        t.note_on(30, 10.0); // C4 expected: any key is fine
+        t.note_on(99, 640.0); // E4 expected at 500: late
+        let judged = t.drain_judged();
+        assert_eq!(judged.iter().map(|j| j.verdict).collect::<Vec<_>>(), vec!["correct", "late"]);
+        assert_eq!(judged[1].onset_ms, 500.0);
+        t.tick(5000.0);
+        let missed = t.drain_judged();
+        assert_eq!(missed.len(), 2, "G4 and C3 never played");
+        assert!(missed.iter().all(|j| j.verdict == "missed"));
+        assert!(t.drain_judged().is_empty());
     }
 
     #[test]

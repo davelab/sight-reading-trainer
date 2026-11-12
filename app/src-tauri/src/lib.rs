@@ -45,6 +45,7 @@ fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
             loop {
                 thread::sleep(POSITION_INTERVAL);
                 let mut results = Vec::new();
+                let mut judged = Vec::new();
                 let mut summary = None;
                 let event = match engine.lock() {
                     Ok(e) if e.follow.is_active() => PositionEvent {
@@ -63,7 +64,10 @@ fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
                             if !e.transport.is_playing() {
                                 // The music reached the end: the run is over.
                                 results.extend(e.timed.tick(f64::INFINITY));
+                                judged = e.timed.drain_judged();
                                 summary = e.stop_timed();
+                            } else {
+                                judged = e.timed.drain_judged();
                             }
                         }
                         PositionEvent {
@@ -80,6 +84,9 @@ fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
                 };
                 for r in results {
                     let _ = app.emit("timed:result", r);
+                }
+                if !judged.is_empty() {
+                    let _ = app.emit("timed:notes", &judged);
                 }
                 if let Some(s) = summary {
                     let _ = app.emit("timed:summary", s);

@@ -229,7 +229,7 @@ impl Engine {
     /// "A tempo" mode: the player plays `hands` (the transport's hands setting),
     /// the app plays the other hand, or nothing when both are practised; the
     /// music starts after the count-in. Leaves follow mode.
-    pub fn start_timed(&mut self, tolerance_ms: f64, count_in: Option<(u32, f64)>) {
+    pub fn start_timed(&mut self, tolerance_ms: f64, count_in: Option<(u32, f64)>, any_key: bool) {
         self.follow.stop();
         let practised = self.transport.hands();
         let rate = self.transport.rate();
@@ -241,7 +241,7 @@ impl Engine {
         });
         let from = self.transport.position_ms();
         self.timed.set_hands(practised);
-        self.timed.start(from, tolerance_ms, rate);
+        self.timed.start_with(from, tolerance_ms, rate, any_key);
         self.hands_before_timed = Some(practised);
         self.with_transport(|t, out| {
             use crate::playback::Hands;
@@ -484,7 +484,7 @@ mod tests {
             t.load(events, out);
             t.set_hands(Hands::Right, out);
         });
-        e.start_timed(100.0, Some((4, 500.0)));
+        e.start_timed(100.0, Some((4, 500.0)), false);
         assert!(e.timed.is_active() && e.transport.is_playing() && e.transport.counting_in());
         assert_eq!(e.transport.hands(), Hands::Left, "the app accompanies with the left hand");
         let summary = e.stop_timed().expect("was running");

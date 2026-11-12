@@ -229,11 +229,18 @@ pub struct CountInArg {
 /// (real time). Results arrive as `timed:result` per measure and
 /// `timed:summary` at the end.
 #[tauri::command]
-pub fn start_timed_mode(state: State<'_, AppState>, tolerance_ms: f64, count_in: Option<CountInArg>) -> CmdResult<()> {
+pub fn start_timed_mode(
+    state: State<'_, AppState>,
+    tolerance_ms: f64,
+    count_in: Option<CountInArg>,
+    any_key: Option<bool>,
+) -> CmdResult<()> {
     if !tolerance_ms.is_finite() || !(20.0..=500.0).contains(&tolerance_ms) {
         return Err(format!("tolleranza fuori intervallo: {tolerance_ms} ms"));
     }
-    with_engine(&state, |e| e.start_timed(tolerance_ms, count_in.map(|c| (c.beats.min(8), c.beat_ms))))
+    with_engine(&state, |e| {
+        e.start_timed(tolerance_ms, count_in.map(|c| (c.beats.min(8), c.beat_ms)), any_key.unwrap_or(false))
+    })
 }
 
 #[tauri::command]
