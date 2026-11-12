@@ -7,7 +7,7 @@ sincronizzato, modalità "segui" via MIDI, analisi armonica e pattern ripetuti.
 - Specifica completa: [`docs/SPEC.md`](docs/SPEC.md)
 - Istruzioni per Claude Code: [`CLAUDE.md`](CLAUDE.md)
 
-## Stato: milestone M3 — analisi armonica
+## Stato: milestone M4 — pattern ripetuti
 
 ### M1 — partitura e playback
 
@@ -69,7 +69,28 @@ della battuta, per collocare l'annotazione con precisione); `measure` è
 l'ordinale della battuta nello spartito scritto (levare = 1, «7» e «7a»
 contano due), non il numero stampato.
 
-Prossime: M4 (pattern), M5 (OMR), M6 (packaging). Vedi la roadmap in `docs/SPEC.md`.
+### M4 — pattern ripetuti
+
+| Fatto | Dove |
+|---|---|
+| Impronta di ogni battuta per due mani insieme e per ciascuna mano: esatta (altezze + ritmo) e trasposta (passi diatonici + ritmo) | `engine/score_engine/analysis/patterns.py` |
+| Ripetizioni più lunghe possibili sulle diagonali di auto-somiglianza, senza sovrapposizioni; almeno 2 battute e 4 note; niente pattern dentro uno più lungo | `patterns.py` |
+| Un colore per pattern sulle battute (solo sul pentagramma della mano interessata), etichetta «A», «B↓m2» | `lib/patterns.ts` |
+| Elenco nella barra con riepilogo «N battute su M ripetono una frase già vista»; clic su un numero di battuta = loop di quella ricorrenza | `components/AnalysisPanel` |
+
+**Criterio di uscita** («Minuetto: tutte le frasi ripetute trovate, nessun
+falso positivo»): `engine/tests/test_patterns.py` richiede esattamente le tre
+frasi ripetute del Minuetto, verificate nota per nota: mano destra 1–6 = 9–14;
+5–6 ripresa un grado sotto a 14–15; 21–22 ripresa una quinta sotto a 29–30.
+
+Rispetto alla specifica: le lunghezze non sono solo finestre di 2/4/8 battute
+ma la ripetizione più lunga trovata (la frase di 6 battute è un pattern solo,
+non tre finestre sovrapposte); il pattern può riguardare una sola mano
+(`Pattern.hands`) e ogni ricorrenza trasposta ha il suo intervallo
+(`Pattern.transpositions`); le varianti «quasi uguali» (fase 2) non ci sono
+ancora. Tempi: 0,25 s per le 313 battute di un quartetto di Beethoven.
+
+Prossime: M5 (OMR), M6 (packaging). Vedi la roadmap in `docs/SPEC.md`.
 
 ## Requisiti
 
@@ -208,6 +229,22 @@ verificato sul Mac (nel container non c'è un sequencer MIDI).
    e playback funzionano lo stesso.
 
 Il passo 4 è stato verificato su Linux (Xvfb) con l'app vera e il sidecar via uv.
+
+## Test end-to-end manuale (criterio di uscita M4)
+
+1. Apri `engine/tests/fixtures/minuet-in-g.musicxml`.
+2. Dopo l'analisi la barra mostra «9 battute su 32 ripetono una frase già
+   vista» e tre pattern: A (6 battute, 1 e 9), B (2 battute, 5 e 14 ↓m2),
+   C (2 battute, 21 e 29 ↓P5), tutti della mano destra.
+3. In partitura le battute sono colorate per pattern, solo sul pentagramma
+   superiore, con «A», «B↓m2», «C↓P5» all'inizio delle ricorrenze. Passando
+   col mouse su un pattern nella barra, le sue battute si accendono e le
+   altre si attenuano.
+4. Clic su «9» di A: il trasporto mostra «Loop 0:12–0:21», ▶ suona le battute
+   9–14 a ripetizione. ✕ toglie il loop.
+5. «Pattern» spento: i colori spariscono.
+
+I passi 2–4 sono stati verificati su Linux (Xvfb) con l'app vera.
 
 ## Note di architettura
 
