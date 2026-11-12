@@ -86,3 +86,16 @@ def test_m3_exit_criterion_bwv269_matches_the_reference_analysis(chorale):
     assert a.root_quality >= 0.85, a.mismatches
     assert a.with_bass >= 0.85
     assert a.key >= 0.75
+
+
+def test_minor_key_vi_and_vii_have_no_flat():
+    """In D minor, Bb major is VI and C major is VII (not bVI / bVII)."""
+    from music21 import key
+
+    from score_engine.analysis.harmony import _consistent_figure
+
+    d = key.Key("d")
+    assert _consistent_figure("bVII", {0, 4, 7}, d) == "VII"
+    assert _consistent_figure("bVI6", {10, 2, 5}, d) == "VI6"
+    assert _consistent_figure("iv", {7, 10, 2}, d) == "iv"
+    assert _consistent_figure("bII6", {3, 7, 10}, d) == "bII6"  # Neapolitan: the flat is right

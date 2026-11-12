@@ -148,6 +148,23 @@ def _secondary_dominant(
     return None
 
 
+def _consistent_figure(figure: str, chord_pcs: set[int], k: m21key.Key) -> str:
+    """The figure as read in `k` must give back the chord. In minor, music21 names
+    the natural-minor VI and VII "bVI" and "bVII", which it then reads as chords
+    on Bb-flat and C-flat in D minor: drop the accidental when that is the chord."""
+
+    def pcs(f: str) -> set[int] | None:
+        try:
+            return {p.pitchClass for p in roman.RomanNumeral(f, k).pitches}
+        except Exception:  # music21 rejects some figures
+            return None
+
+    if pcs(figure) == chord_pcs:
+        return figure
+    plain = figure.lstrip("b#")
+    return plain if plain != figure and pcs(plain) == chord_pcs else figure
+
+
 def _function(rn: roman.RomanNumeral, diatonic: bool) -> Function:
     if not diatonic:
         return "other"
@@ -206,7 +223,7 @@ def label_measure(m: MeasureSlices, k: m21key.Key) -> list[ChordLabel]:
         ]
         diatonic = chord_pcs <= scale
         rn = roman.romanNumeralFromChord(m21chord.Chord(voiced), k)
-        figure = rn.figure
+        figure = _consistent_figure(rn.figure, chord_pcs, k)
         function = _function(rn, diatonic)
         if not diatonic and tmpl.quality in ("major", "dominant-seventh"):
             secondary = _secondary_dominant(chord_pcs, inversion, tmpl.quality != "major", k)
