@@ -40,12 +40,9 @@ export function Keyboard() {
   const { transpose, showKeyNames, showRight, showLeft } = useView()
   const eventsById = useMemo(() => new Map(events.map((e) => [e.noteId, e])), [events])
   const allLights = keyLights(currentNoteIds, eventsById, following ? expectedPitches : undefined, transpose)
-  const lights = new Map(
-    [...allLights].filter(([, l]) => (l.hand === 'right' ? showRight : showLeft))
-  )
+  const lights = new Map([...allLights].filter(([, l]) => (l.hand === 'right' ? showRight : showLeft)))
   const held = new Set(heldPitches)
   const wrong = new Set(wrongPitches)
-
 
   const cls = (p: number) => {
     if (held.has(p)) return following ? (wrong.has(p) ? 'wrong' : 'correct') : 'played'

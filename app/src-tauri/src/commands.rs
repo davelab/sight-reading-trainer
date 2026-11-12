@@ -270,6 +270,28 @@ pub async fn omr_cancel(state: State<'_, AppState>, job_id: String) -> CmdResult
     .map_err(|e| e.to_string())?
 }
 
+/// Start transcribing a piano recording (mp3, wav, m4a, ...) in the `omr` sidecar,
+/// which also runs the transcription model. Returns `{jobId}` at once; progress
+/// and outcome arrive as `transcribe:progress`, `transcribe:done`, `transcribe:failed`.
+#[tauri::command]
+pub async fn transcribe_audio(state: State<'_, AppState>, path: String) -> CmdResult<serde_json::Value> {
+    let client = state.omr.clone();
+    let params = serde_json::json!({ "audioPath": path });
+    tauri::async_runtime::spawn_blocking(move || client.request("transcribe.run", params, Duration::from_secs(120)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn transcribe_cancel(state: State<'_, AppState>, job_id: String) -> CmdResult<serde_json::Value> {
+    let client = state.omr.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        client.request("transcribe.cancel", serde_json::json!({ "jobId": job_id }), Duration::from_secs(10))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Correct one note of a recognised score (see engine `score.edit`).
 #[tauri::command]
 pub async fn score_edit(
@@ -296,6 +318,12 @@ pub async fn score_check(state: State<'_, AppState>, musicxml: String) -> CmdRes
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Write a binary file chosen by the user in a save dialog (MIDI export).
+#[tauri::command]
+pub fn save_binary_file(path: String, contents: Vec<u8>) -> CmdResult<()> {
+    std::fs::write(&path, contents).map_err(|e| format!("impossibile salvare {path}: {e}"))
 }
 
 /// Write a text file chosen by the user in a save dialog (MusicXML export).

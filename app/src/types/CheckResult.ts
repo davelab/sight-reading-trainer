@@ -4,22 +4,22 @@
  * Result of ``score.check`` and ``score.edit``.
  */
 export interface CheckResult {
-  musicxml: string;
-  warnings: OmrWarning[];
+  musicxml: string
+  warnings: OmrWarning[]
   /**
    * score.edit: where the edited (or inserted) note is now
    */
-  note?: NoteRef | null;
+  note?: NoteRef | null
 }
 /**
  * This interface was referenced by `CheckResult`'s JSON-Schema
  * via the `definition` "OmrWarning".
  */
 export interface OmrWarning {
-  measure: number;
-  staff?: number | null;
-  kind: "duration" | "page";
-  message: string;
+  measure: number
+  staff?: number | null
+  kind: 'duration' | 'page'
+  message: string
 }
 /**
  * A note found by position (never by ID): what the review screen sends to edit.
@@ -31,17 +31,17 @@ export interface NoteRef {
   /**
    * Measure ordinal in the written score
    */
-  measure: number;
+  measure: number
   /**
    * Global staff number: staves of all parts in order
    */
-  staff: number;
+  staff: number
   /**
    * Onset in quarter notes from the downbeat
    */
-  offset: number;
+  offset: number
   /**
    * MIDI pitch
    */
-  pitch: number;
+  pitch: number
 }

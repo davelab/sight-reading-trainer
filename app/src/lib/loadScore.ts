@@ -3,13 +3,19 @@ import { buildNoteRefs } from './noteRefs'
 import { scoreDurationMs } from './timemap'
 import { loadScore } from './verovio'
 import { runAnalysis, useAnalysis } from '../stores/analysis'
-import { startPdfImport } from '../stores/omr'
+import { startAudioTranscription, startPdfImport } from '../stores/omr'
 import { useMidi } from '../stores/midi'
 import { useScore } from '../stores/score'
 import { useTransport } from '../stores/transport'
 import { useView } from '../stores/view'
 
 export const SCORE_EXTENSIONS = ['musicxml', 'xml', 'mxl', 'pdf']
+/** Piano recordings the transcription accepts (engine/score_engine/transcribe/jobs.py). */
+export const AUDIO_EXTENSIONS = ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg', 'aif', 'aiff', 'caf']
+
+export function isAudioFile(name: string): boolean {
+  return AUDIO_EXTENSIONS.includes(name.split('.').pop()?.toLowerCase() ?? '')
+}
 
 export function isScoreFile(name: string): boolean {
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
@@ -48,7 +54,8 @@ export async function openMusicXml(
     noteRefs: buildNoteRefs(onsets, measureIds, events),
     error: null
   })
-  if (analyze) void runAnalysis(musicxml) // in the background: the score is usable meanwhile
+  if (analyze)
+    void runAnalysis(musicxml) // in the background: the score is usable meanwhile
   else useAnalysis.setState({ analysis: null, status: 'idle', error: null, selectedPattern: null })
 
   const transport = useTransport.getState()
@@ -86,8 +93,11 @@ async function withLoading(task: () => Promise<void>): Promise<void> {
 /** Open a file by path through the Rust core (Tauri only; handles .mxl and PDF import). */
 export function openScorePath(path: string): Promise<void> {
   if (path.toLowerCase().endsWith('.pdf')) return startPdfImport(path)
+  if (isAudioFile(path)) return startAudioTranscription(path)
   return withLoading(async () => {
-    if (!isScoreFile(path)) throw new Error('Formato non supportato: usa .musicxml, .xml, .mxl o .pdf')
+    if (!isScoreFile(path)) {
+      throw new Error('Formato non supportato: usa .musicxml, .xml, .mxl, .pdf o una registrazione audio')
+    }
     const file = await ipc.loadScore(path)
     await openMusicXml(file.fileName, file.musicxml, null)
   })

@@ -4,7 +4,10 @@ import './ViewSettings.css'
 /** Display, hands, sound and zoom options of the falling-notes view and the keyboard. */
 export function ViewSettings({ onClose }: { onClose: () => void }) {
   const v = useView()
-  const check = (key: 'showChords' | 'showNoteNames' | 'showKeyNames' | 'showNoteLines' | 'showRight' | 'showLeft', label: string) => (
+  const check = (
+    key: 'showChords' | 'showNoteNames' | 'showKeyNames' | 'showNoteLines' | 'showRight' | 'showLeft',
+    label: string
+  ) => (
     <label className="vs-check">
       <input type="checkbox" checked={v[key]} onChange={(e) => v.set({ [key]: e.target.checked })} />
       {label}
@@ -15,7 +18,14 @@ export function ViewSettings({ onClose }: { onClose: () => void }) {
       <span>
         {label} <output>{Math.round(v[key] * 100)}%</output>
       </span>
-      <input type="range" min={0} max={1} step={0.01} value={v[key]} onChange={(e) => v.set({ [key]: Number(e.target.value) })} />
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={v[key]}
+        onChange={(e) => v.set({ [key]: Number(e.target.value) })}
+      />
     </label>
   )
   return (
@@ -72,11 +82,7 @@ export function ViewSettings({ onClose }: { onClose: () => void }) {
         </label>
       </section>
       <footer>
-        <button
-          onClick={() =>
-            v.set({ ...DEFAULT_VIEW, mode: v.mode, transpose: v.transpose })
-          }
-        >
+        <button onClick={() => v.set({ ...DEFAULT_VIEW, mode: v.mode, transpose: v.transpose })}>
           Ripristina predefiniti
         </button>
       </footer>

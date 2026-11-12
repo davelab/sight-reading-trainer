@@ -4,22 +4,22 @@
  * Payload of the ``omr.done`` notification.
  */
 export interface OmrResult {
-  jobId: string;
-  musicxml: string;
-  pages: number;
+  jobId: string
+  musicxml: string
+  pages: number
   /**
    * One data: URI image per recognised page
    */
-  previews: string[];
-  warnings: OmrWarning[];
+  previews: string[]
+  warnings: OmrWarning[]
 }
 /**
  * This interface was referenced by `OmrResult`'s JSON-Schema
  * via the `definition` "OmrWarning".
  */
 export interface OmrWarning {
-  measure: number;
-  staff?: number | null;
-  kind: "duration" | "page";
-  message: string;
+  measure: number
+  staff?: number | null
+  kind: 'duration' | 'page'
+  message: string
 }

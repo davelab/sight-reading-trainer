@@ -5,7 +5,15 @@
  */
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { Analysis, CheckResult, NoteRef, OmrProgress, OmrResult } from '../types'
+import type {
+  Analysis,
+  CheckResult,
+  NoteRef,
+  OmrProgress,
+  OmrResult,
+  TranscribeProgress,
+  TranscribeResult
+} from '../types'
 import type { PlaybackEvent } from './timemap'
 
 export type Hands = 'both' | 'right' | 'left'
@@ -83,7 +91,12 @@ export const ipc = {
   scoreEdit: (musicxml: string, note: NoteRef, action: EditAction, value?: NoteValue) =>
     invoke<CheckResult>('score_edit', { musicxml, note, action, value: value ?? null }),
   scoreCheck: (musicxml: string) => invoke<CheckResult>('score_check', { musicxml }),
-  saveTextFile: (path: string, contents: string) => invoke<void>('save_text_file', { path, contents })
+  saveTextFile: (path: string, contents: string) => invoke<void>('save_text_file', { path, contents }),
+  saveBinaryFile: (path: string, contents: Uint8Array) =>
+    invoke<void>('save_binary_file', { path, contents: Array.from(contents) }),
+  /** Start transcribing a piano recording; progress and result arrive as transcribe:* events. */
+  transcribeAudio: (path: string) => invoke<{ jobId: string }>('transcribe_audio', { path }),
+  transcribeCancel: (jobId: string) => invoke<{ cancelled: boolean }>('transcribe_cancel', { jobId })
 }
 
 /** Mirrors EditAction in engine/score_engine/models.py. */
@@ -122,6 +135,18 @@ export function onOmrDone(cb: (r: OmrResult) => void): Promise<UnlistenFn> {
 
 export function onOmrFailed(cb: (f: OmrFailed) => void): Promise<UnlistenFn> {
   return listen<OmrFailed>('omr:failed', (e) => cb(e.payload))
+}
+
+export function onTranscribeProgress(cb: (p: TranscribeProgress) => void): Promise<UnlistenFn> {
+  return listen<TranscribeProgress>('transcribe:progress', (e) => cb(e.payload))
+}
+
+export function onTranscribeDone(cb: (r: TranscribeResult) => void): Promise<UnlistenFn> {
+  return listen<TranscribeResult>('transcribe:done', (e) => cb(e.payload))
+}
+
+export function onTranscribeFailed(cb: (f: OmrFailed) => void): Promise<UnlistenFn> {
+  return listen<OmrFailed>('transcribe:failed', (e) => cb(e.payload))
 }
 
 export function onPlaybackPosition(cb: (p: PlaybackPosition) => void): Promise<UnlistenFn> {

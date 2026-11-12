@@ -30,7 +30,13 @@ describe('chordTimes', () => {
     { measureId: 'm2', index: 2, ms: 2000 }
   ]
   const onsets = new Map([
-    ['m1', [{ q: 0, noteIds: ['a'] }, { q: 2, noteIds: ['b'] }]],
+    [
+      'm1',
+      [
+        { q: 0, noteIds: ['a'] },
+        { q: 2, noteIds: ['b'] }
+      ]
+    ],
     ['m2', [{ q: 0, noteIds: ['c'] }]]
   ])
   const events = [ev('a', 0, 500), ev('b', 1000, 500), ev('c', 2000, 500)]

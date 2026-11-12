@@ -16,6 +16,7 @@ output the 7 frame-level maps of the original (batch, 1001, 88 or 1):
 Usage: python export_onnx.py CHECKPOINT.pth OUT.onnx
 """
 
+import inspect
 import sys
 
 import numpy as np
@@ -54,6 +55,9 @@ def main(checkpoint: str, out: str) -> None:
     dummy = torch.from_numpy((rng.standard_normal((1, SEGMENT)) * 0.1).astype(np.float32))
     with torch.no_grad():
         expected = [t.numpy() for t in wrapper(dummy)]
+        options = {}
+        if "dynamo" in inspect.signature(torch.onnx.export).parameters:
+            options["dynamo"] = False  # torch >= 2.5: keep the TorchScript exporter
         torch.onnx.export(
             wrapper,
             (dummy,),
@@ -65,7 +69,7 @@ def main(checkpoint: str, out: str) -> None:
                 **{k.removesuffix("_output"): {0: "batch"} for k in OUTPUTS},
             },
             opset_version=17,
-            dynamo=False,
+            **options,
         )
     # The exported model must give the same maps as PyTorch.
     import onnxruntime as ort

@@ -4,85 +4,85 @@
  * Result of the ``analyze`` JSON-RPC method.
  */
 export interface Analysis {
-  schemaVersion?: 1;
-  key?: KeyRegion[];
-  chords?: Chord[];
-  patterns?: Pattern[];
-  sections?: Section[];
+  schemaVersion?: 1
+  key?: KeyRegion[]
+  chords?: Chord[]
+  patterns?: Pattern[]
+  sections?: Section[]
 }
 /**
  * This interface was referenced by `Analysis`'s JSON-Schema
  * via the `definition` "KeyRegion".
  */
 export interface KeyRegion {
-  fromMeasure: number;
-  toMeasure: number;
+  fromMeasure: number
+  toMeasure: number
   /**
    * Pitch class name, e.g. 'G', 'F#', 'Bb'
    */
-  tonic: string;
-  mode: "major" | "minor";
-  confidence: number;
+  tonic: string
+  mode: 'major' | 'minor'
+  confidence: number
 }
 /**
  * This interface was referenced by `Analysis`'s JSON-Schema
  * via the `definition` "Chord".
  */
 export interface Chord {
-  measure: number;
+  measure: number
   /**
    * 1-based beat within the measure, as counted by the meter
    */
-  beat: number;
+  beat: number
   /**
    * Position from the start of the measure, in quarter notes
    */
-  offset?: number;
+  offset?: number
   /**
    * Chord symbol, e.g. 'D7'
    */
-  symbol: string;
+  symbol: string
   /**
    * Roman numeral in the local key, e.g. 'V7'
    */
-  roman: string;
-  function: "tonic" | "predominant" | "dominant" | "other";
-  confidence?: number | null;
+  roman: string
+  function: 'tonic' | 'predominant' | 'dominant' | 'other'
+  confidence?: number | null
 }
 /**
  * This interface was referenced by `Analysis`'s JSON-Schema
  * via the `definition` "Pattern".
  */
 export interface Pattern {
-  id: string;
-  kind: "exact" | "transposed" | "variant";
+  id: string
+  kind: 'exact' | 'transposed' | 'variant'
   /**
    * Length in measures
    */
-  length: number;
+  length: number
   /**
    * Starting measure of every occurrence
    */
-  occurrences: number[];
+  occurrences: number[]
   /**
    * Transposition of the first transposed occurrence, e.g. '-P5'
    */
-  interval?: string | null;
+  interval?: string | null
   /**
    * Staves the pattern is in: all, or one hand of a piano
    */
-  hands?: "both" | "right" | "left";
+  hands?: 'both' | 'right' | 'left'
   /**
    * Per occurrence, interval from the first one ('P1', '+M2', '-P5')
    */
-  transpositions?: string[] | null;
+  transpositions?: string[] | null
 }
 /**
  * This interface was referenced by `Analysis`'s JSON-Schema
  * via the `definition` "Section".
  */
 export interface Section {
-  label: string;
-  fromMeasure: number;
-  toMeasure: number;
+  label: string
+  fromMeasure: number
+  toMeasure: number
 }

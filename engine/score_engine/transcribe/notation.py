@@ -215,6 +215,11 @@ def to_score(
         for p in placed:
             p.onset += pickup
             p.end += pickup
+    # The last notes ring on (decay, pedal): end them with the last measure.
+    last = max(p.onset for p in placed)
+    final_bar_end = pickup + (int((last - pickup) // meter_beats) + 1) * meter_beats
+    for p in placed:
+        p.end = min(p.end, Fraction(final_bar_end))
     split_hands(placed, meter_beats)
 
     bpm = float(60 / np.median(np.diff(beats))) if len(beats) > 1 else 100.0
@@ -278,6 +283,8 @@ def _spell(score, k) -> None:  # noqa: ANN001
     scale = {p.name for p in k.getScale().getPitches()}
     for n in score.recurse().notes:
         for p in n.pitches:
+            if p.accidental is not None and p.accidental.alter == 0:
+                p.accidental = None  # from MIDI numbers: a natural sign on every white key
             if p.name in scale:
                 continue
             alt = p.getEnharmonic()

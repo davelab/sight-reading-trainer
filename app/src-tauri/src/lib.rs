@@ -65,6 +65,12 @@ fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
         .expect("spawn position thread");
 }
 
+/// Event name parts for a sidecar job notification (`omr.*`, `transcribe.*`).
+fn notification_event(method: &str) -> Option<(&str, &str)> {
+    let (job, event) = method.split_once('.')?;
+    matches!(job, "omr" | "transcribe").then_some((job, event))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -83,14 +89,18 @@ pub fn run() {
             analysis.warm_up();
             // The OMR sidecar starts on the first import; its models live in the app data dir.
             let data_dir = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("score-studio"));
-            let omr_launcher = engine::Launcher::locate("omr")
-                .map(|l| l.with_env("SCORE_STUDIO_DATA_DIR", data_dir.to_string_lossy()));
+            // The same sidecar transcribes audio; the model ships in the resources.
+            let resources = dirs.iter().find(|d| d.is_dir()).cloned().unwrap_or_default();
+            let omr_launcher = engine::Launcher::locate("omr").map(|l| {
+                l.with_env("SCORE_STUDIO_DATA_DIR", data_dir.to_string_lossy())
+                    .with_env("SCORE_STUDIO_RESOURCES", resources.to_string_lossy())
+            });
             let omr = std::sync::Arc::new(engine::EngineClient::new("omr", omr_launcher));
             let handle = app.handle().clone();
             omr.set_notification_handler(std::sync::Arc::new(move |method, params| {
-                // omr.progress -> omr:progress, omr.done -> omr:done, omr.failed -> omr:failed
-                if let Some(event) = method.strip_prefix("omr.") {
-                    let _ = handle.emit(&format!("omr:{event}"), params);
+                // omr.progress -> omr:progress, transcribe.done -> transcribe:done, ...
+                if let Some((job, event)) = notification_event(method) {
+                    let _ = handle.emit(&format!("{job}:{event}"), params);
                 }
             }));
             app.manage(AppState {
@@ -119,6 +129,9 @@ pub fn run() {
             commands::analyze,
             commands::import_pdf,
             commands::omr_cancel,
+            commands::transcribe_audio,
+            commands::transcribe_cancel,
+            commands::save_binary_file,
             commands::score_edit,
             commands::score_check,
             commands::save_text_file,
@@ -129,4 +142,17 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Score Studio");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::notification_event;
+
+    #[test]
+    fn job_notifications_become_events() {
+        assert_eq!(notification_event("omr.progress"), Some(("omr", "progress")));
+        assert_eq!(notification_event("transcribe.done"), Some(("transcribe", "done")));
+        assert_eq!(notification_event("analyze.done"), None);
+        assert_eq!(notification_event("ping"), None);
+    }
 }

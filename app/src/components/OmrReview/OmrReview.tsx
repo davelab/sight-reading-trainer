@@ -3,9 +3,10 @@ import type { EditAction, NoteValue } from '../../lib/ipc'
 import { pitchName } from '../../lib/noteRefs'
 import { revealMeasure } from '../../lib/overlay'
 import {
-  cancelPdfImport,
+  cancelImport,
   correct,
   finishReview,
+  savePerformanceMidi,
   saveRecognised,
   selectNote,
   undoCorrection,
@@ -71,10 +72,42 @@ const STAGE: Record<string, string> = {
   merge: 'Unione delle pagine'
 }
 
+const TRANSCRIBE_STAGE: Record<string, string> = {
+  load: 'Lettura della registrazione',
+  model: 'Ascolto delle note (rete neurale)',
+  notation: 'Scrittura della partitura: tempo, battute, mani'
+}
+
 /** Import progress, as a card over the score, with «Annulla». */
 export function OmrProgress() {
-  const { phase, fileName, progress, error } = useOmr()
+  const { phase, source, fileName, progress, transcribeProgress, error } = useOmr()
   if (phase !== 'running' && phase !== 'error') return null
+  if (source === 'audio') {
+    const stage = transcribeProgress?.stage ?? 'load'
+    return (
+      <div className="omr-card" role="status">
+        <strong>Trascrizione di «{fileName ?? 'audio'}»</strong>
+        {phase === 'running' ? (
+          <>
+            <span>
+              {TRANSCRIBE_STAGE[stage]}
+              {stage === 'model' && transcribeProgress ? ` ${Math.round(transcribeProgress.fraction * 100)}%` : '…'}
+            </span>
+            <progress
+              value={stage === 'model' ? Math.max(0.02, transcribeProgress?.fraction ?? 0) : undefined}
+              max={1}
+            />
+            <button onClick={() => void cancelImport()}>Annulla</button>
+          </>
+        ) : (
+          <>
+            <span className="omr-error">{error}</span>
+            <button onClick={() => useOmr.setState({ phase: 'idle', error: null })}>Chiudi</button>
+          </>
+        )}
+      </div>
+    )
+  }
   const stage = progress?.stage ?? 'render'
   const fraction = progress && progress.total ? (stage === 'merge' ? 1 : (progress.page - 0.5) / progress.total) : 0
   return (
@@ -87,7 +120,7 @@ export function OmrProgress() {
             {stage === 'recognize' && progress ? ` pagina ${progress.page} di ${progress.total}` : '…'}
           </span>
           <progress value={stage === 'recognize' ? Math.max(0.02, fraction) : undefined} max={1} />
-          <button onClick={() => void cancelPdfImport()}>Annulla</button>
+          <button onClick={() => void cancelImport()}>Annulla</button>
         </>
       ) : (
         <>
@@ -101,7 +134,7 @@ export function OmrProgress() {
 
 /** Correction toolbar and warnings, above the score while reviewing a recognised PDF. */
 export function OmrReviewBar() {
-  const { fileName, warnings, selected, history, busy, error } = useOmr()
+  const { source, fileName, facts, midi, warnings, selected, history, busy, error } = useOmr()
   const labels = useScore((s) => s.measureLabels)
   const measureIds = useScore((s) => s.measureIds)
   const [showAll, setShowAll] = useState(false)
@@ -146,12 +179,23 @@ export function OmrReviewBar() {
   return (
     <div className="omr-review-bar">
       <div className="omr-row">
-        <strong>Correzione di «{fileName}»</strong>
-        <span className="omr-hint">
-          Confronta con il PDF a sinistra; clic su una nota per correggerla. Per correzioni più ampie salva il MusicXML
-          e aprilo in MuseScore.
-        </span>
+        <strong>
+          {source === 'audio' ? 'Trascrizione di' : 'Correzione di'} «{fileName}»
+        </strong>
+        {source === 'audio' && facts ? (
+          <span className="omr-hint">
+            {facts.beatsPerMeasure}/4 · ♩ = {facts.tempo} · {keyName(facts.key)}
+            {facts.pickupBeats > 0 ? ` · anacrusi di ${facts.pickupBeats}` : ''}. Ascoltala con ▶ e clic su una nota per
+            correggerla; il MIDI conserva l'esecuzione com'era, con rubato e pedale.
+          </span>
+        ) : (
+          <span className="omr-hint">
+            Confronta con il PDF a sinistra; clic su una nota per correggerla. Per correzioni più ampie salva il
+            MusicXML e aprilo in MuseScore.
+          </span>
+        )}
         <span className="omr-actions">
+          {midi && <button onClick={() => void savePerformanceMidi()}>Salva MIDI…</button>}
           <button onClick={() => void saveRecognised()}>Salva MusicXML…</button>
           <button className="primary" onClick={finishReview}>
             Fine correzione
@@ -283,8 +327,18 @@ export function OmrReviewBar() {
 }
 
 /** The PDF pages as recognised, beside the score. */
+/** "G major" -> "Sol maggiore". */
+export function keyName(key: string): string {
+  const [tonic, mode] = key.split(' ')
+  const names: Record<string, string> = { C: 'Do', D: 'Re', E: 'Mi', F: 'Fa', G: 'Sol', A: 'La', B: 'Si' }
+  const accidental = tonic.slice(1).replace(/#/g, '♯').replace(/b/g, '♭')
+  const base = names[tonic[0]] ?? tonic[0]
+  return `${base}${accidental} ${mode === 'minor' ? 'minore' : 'maggiore'}`
+}
+
 export function OmrPages() {
   const previews = useOmr((s) => s.previews)
+  if (!previews.length) return null
   return (
     <aside className="omr-pages" aria-label="PDF originale">
       {previews.map((src, i) => (

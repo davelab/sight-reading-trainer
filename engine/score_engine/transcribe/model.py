@@ -42,12 +42,12 @@ def model_path() -> Path:
     if env := os.environ.get("SCORE_STUDIO_TRANSCRIPTION_MODEL"):
         candidates.append(Path(env))
     if res := os.environ.get("SCORE_STUDIO_RESOURCES"):
-        candidates.append(Path(res) / "models" / MODEL_FILE)
+        candidates.append(Path(res) / MODEL_FILE)  # bundled with the app
     from ..omr.jobs import data_dir
 
     candidates.append(data_dir() / "models" / MODEL_FILE)
     here = Path(__file__).resolve()
-    candidates.append(here.parents[3] / "app" / "src-tauri" / "resources" / "models" / MODEL_FILE)
+    candidates.append(here.parents[3] / "app" / "src-tauri" / "resources" / MODEL_FILE)
     for c in candidates:
         if c.is_file():
             return c

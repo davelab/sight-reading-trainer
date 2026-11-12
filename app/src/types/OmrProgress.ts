@@ -4,8 +4,8 @@
  * Payload of the ``omr.progress`` notification.
  */
 export interface OmrProgress {
-  jobId: string;
-  stage: "render" | "download" | "recognize" | "merge";
-  page: number;
-  total: number;
+  jobId: string
+  stage: 'render' | 'download' | 'recognize' | 'merge'
+  page: number
+  total: number
 }

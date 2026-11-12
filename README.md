@@ -125,7 +125,28 @@ diesis persi) vanno viste confrontando con il PDF.
 | Trasposizione −/+ in semitoni: suono, tastiera, note cadenti e modalità «Segui» | `playback.rs`, `follow.rs`, `Transport` |
 | Barra di avanzamento trascinabile | `Transport` |
 
-Il pedale arriverà con la trascrizione da audio (l'unica fonte che lo conosce).
+### Trascrizione da audio (dopo l'MVP, su richiesta)
+
+«Trascrivi audio…» (o trascina un file sulla finestra) trasforma una
+registrazione di pianoforte (WAV, MP3, M4A, FLAC, OGG, AIFF; anche dal telefono)
+in partitura e MIDI. Funziona offline, senza GPU.
+
+| Fatto | Dove |
+|---|---|
+| Note, velocity e pedale con la rete di ByteDance (Kong et al. 2021, MIT) convertita in ONNX: niente PyTorch nell'app | `engine/score_engine/transcribe/model.py`, `postprocess.py` |
+| Battiti che seguono l'esecutore (agenti alla BeatRoot, anche all'indietro per l'inizio): il rubato finisce nella griglia, non in ritmi strani | `transcribe/beats.py` |
+| Metro e primi tempi (Viterbi sugli accenti: bassi, accordi, dinamica), battute regolari, griglia a semicrome o terzine per ogni battito, mani divise per altezza, tonalità e grafia delle alterazioni, segni di pedale | `transcribe/notation.py` |
+| Job in background con avanzamento e «Annulla»; revisione con gli stessi strumenti dell'OMR; «Salva MIDI…» (l'esecuzione com'era, con rubato e pedale) e «Salva MusicXML…» | `transcribe/jobs.py`, `stores/omr.ts`, `components/OmrReview` |
+
+Su un minuetto sintetizzato: 100% delle note nella battuta e nel tempo giusti a
+tempo costante, 90% con rubato forte (tempo tra 90 e 150 per battuta). Limiti
+noti: un ritardando che dimezza il tempo dentro una battuta (ultime battute del
+test) e i cambi di tempo improvvisi del 40% possono spostare il battito; lì si
+corregge in revisione, oppure si parte dal MIDI.
+
+Il modello (154 MB) non è nel repository: `scripts/fetch-transcription-model.sh`
+lo scarica da Zenodo e lo converte una volta (vedi «Installazione», passo 2).
+
 La M6 (firma, notarizzazione, beta) è sospesa: l'app è per uso personale.
 
 ## Requisiti
@@ -155,7 +176,12 @@ stesso, e un'app compilata in locale si apre senza blocchi di Gatekeeper.
    git clone https://github.com/davelab/sight-reading-trainer.git
    cd sight-reading-trainer
    scripts/fetch-soundfont.sh
+   scripts/fetch-transcription-model.sh
    ```
+
+   Il secondo comando serve alla trascrizione da audio: scarica il modello
+   (~165 MB) e lo converte in ONNX in un ambiente temporaneo con PyTorch
+   (qualche minuto, una volta sola; sui Mac Intel usa PyTorch 2.2.2).
 
 3. Compilazione (la prima volta 10–25 minuti; su Intel produce un'app x86_64):
 
@@ -307,7 +333,9 @@ Il codice di Score Studio è MIT. L'import da PDF usa
 [homr](https://github.com/liebharc/homr), con licenza **AGPL-3.0**, incluso
 nel sidecar `omr` dell'app (decisione presa per la M5). Chi distribuisce l'app
 impacchettata con homr deve offrire ai destinatari il sorgente completo
-corrispondente sotto AGPL-3.0. Prima di vendere l'app serve un parere legale
+corrispondente sotto AGPL-3.0. Il modello di trascrizione
+([piano_transcription_inference](https://github.com/qiuqiangkong/piano_transcription_inference),
+ByteDance) è MIT. Prima di vendere l'app serve un parere legale
 (vedi `docs/SPEC.md`, «Rischi e decisioni aperte»).
 
 ## Note di architettura

@@ -70,6 +70,8 @@ def test_strict_performance_is_notated_exactly():
     xml, facts = to_score(perform(lambda m: 120), [])
     assert facts == {"tempo": 120, "beatsPerMeasure": 3, "key": "G major", "pickupBeats": 0.0}
     assert agreement(xml) == 1.0
+    assert "<accidental>natural" not in xml  # white keys need no sign in G major
+    assert "<tie " not in xml  # nothing rings past the last bar
 
 
 def test_rubato_performance_keeps_meter_and_bars():

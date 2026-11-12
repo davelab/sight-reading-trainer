@@ -4,22 +4,22 @@
  * Payload of the ``transcribe.done`` notification.
  */
 export interface TranscribeResult {
-  jobId: string;
-  musicxml: string;
+  jobId: string
+  musicxml: string
   /**
    * The performance as played (with pedal), base64 Standard MIDI File
    */
-  midi: string;
+  midi: string
   /**
    * Seconds of audio
    */
-  duration: number;
+  duration: number
   /**
    * Notes detected
    */
-  notes: number;
-  facts: TranscribeFacts;
-  warnings: OmrWarning[];
+  notes: number
+  facts: TranscribeFacts
+  warnings: OmrWarning[]
 }
 /**
  * What the transcription inferred about the performance.
@@ -31,21 +31,21 @@ export interface TranscribeFacts {
   /**
    * Median beat, in quarter notes per minute
    */
-  tempo: number;
-  beatsPerMeasure: number;
+  tempo: number
+  beatsPerMeasure: number
   /**
    * e.g. 'G major', 'Bb minor'
    */
-  key: string;
-  pickupBeats: number;
+  key: string
+  pickupBeats: number
 }
 /**
  * This interface was referenced by `TranscribeResult`'s JSON-Schema
  * via the `definition` "OmrWarning".
  */
 export interface OmrWarning {
-  measure: number;
-  staff?: number | null;
-  kind: "duration" | "page";
-  message: string;
+  measure: number
+  staff?: number | null
+  kind: 'duration' | 'page'
+  message: string
 }
