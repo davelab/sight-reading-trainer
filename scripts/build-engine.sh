@@ -27,13 +27,26 @@ WORK="$ROOT/engine/build"
 # Pass "engine" or "omr" to build only one.
 WHAT="${1:-all}"
 
-build() {
+# PyInstaller's binary cache, kept inside the project instead of the user's
+# Library: an interrupted build can corrupt it ("bincache may be corrupted").
+export PYINSTALLER_CONFIG_DIR="$WORK/pyinstaller-cache"
+
+pyinstaller() {
   local name="$1"; shift
   (cd "$ROOT/engine" && uv run --quiet --with 'pyinstaller>=6' pyinstaller \
     --onefile --noconfirm --clean --log-level WARN \
     --name "$name-$TRIPLE" \
     --distpath "$OUT" --workpath "$WORK/$name" --specpath "$WORK" \
     "$@" pyinstaller_entry.py)
+}
+
+build() {
+  local name="$1"; shift
+  if ! pyinstaller "$name" "$@"; then
+    echo "build of $name failed: clearing the PyInstaller cache and retrying once" >&2
+    rm -rf "$PYINSTALLER_CONFIG_DIR" "$WORK/$name"
+    pyinstaller "$name" "$@"
+  fi
   echo "built $OUT/$name-$TRIPLE" >&2
   # Smoke test: the binary must answer ping on stdout.
   echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | "$OUT/$name-$TRIPLE" 2>/dev/null | grep -q '"version"' \
