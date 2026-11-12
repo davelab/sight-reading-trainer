@@ -8,6 +8,9 @@
   --border: #cfcdc7;
   --accent: #3a64d8;
   --cursor: #e0a800;
+  /* Hands: notes to play on the keyboard and the score cursor. */
+  --hand-right: #e0a800;
+  --hand-left: #8e5bd6;
   --ok: #2e9b57;
   /* Harmonic functions, on the white score page in both themes. */
   --fn-tonic: #1f5fbf;

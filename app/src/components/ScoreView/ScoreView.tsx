@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { inTauri, ipc } from '../../lib/ipc'
 import { drawAnalysis, systemSpacingFor } from '../../lib/analysisOverlay'
 import { followCursor, highlightNotes, markMeasures } from '../../lib/overlay'
@@ -24,6 +24,12 @@ export function ScoreView() {
   const onsets = useScore((s) => s.onsets)
   const analysis = useAnalysis((s) => s.analysis)
   const display = useAnalysis((s) => s.display)
+  const events = useScore((s) => s.events)
+  const leftHandIds = useRef(new Set<string>())
+  useEffect(() => {
+    leftHandIds.current = new Set(events.filter((e) => e.staff >= 2).map((e) => e.noteId))
+  }, [events])
+  const isLeftHand = useCallback((id: string) => leftHandIds.current.has(id), [])
   const [width, setWidth] = useState(0)
   const spacingSystem = useAnalysis((s) => systemSpacingFor(s.display, s.analysis !== null))
   const [pages, setPages] = useState<string[]>([])
@@ -59,7 +65,7 @@ export function ScoreView() {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    highlighted.current = highlightNotes(el, [], currentNoteIds)
+    highlighted.current = highlightNotes(el, [], currentNoteIds, isLeftHand)
     // Only when the SVG changes; cursor moves are handled below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pages])
@@ -67,9 +73,9 @@ export function ScoreView() {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    highlighted.current = highlightNotes(el, highlighted.current, currentNoteIds)
+    highlighted.current = highlightNotes(el, highlighted.current, currentNoteIds, isLeftHand)
     if (playing || following) followCursor(el, currentNoteIds[0])
-  }, [currentNoteIds, playing, following])
+  }, [currentNoteIds, playing, following, isLeftHand])
 
   // Harmonic analysis: symbols above, roman numerals below, anchored to (measure, offset).
   useEffect(() => {

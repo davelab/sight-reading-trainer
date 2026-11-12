@@ -5,14 +5,27 @@
  */
 
 const PLAYING = 'playing'
+const LEFT_HAND = 'hand-left'
 
-/** Swap the highlighted notes; returns the ids now highlighted. */
-export function highlightNotes(root: ParentNode, previous: readonly string[], next: readonly string[]): string[] {
+/**
+ * Swap the highlighted notes; returns the ids now highlighted. Notes for which
+ * `isLeftHand` is true get the left-hand colour.
+ */
+export function highlightNotes(
+  root: ParentNode,
+  previous: readonly string[],
+  next: readonly string[],
+  isLeftHand: (id: string) => boolean = () => false
+): string[] {
   const keep = new Set(next)
   for (const id of previous) {
-    if (!keep.has(id)) root.querySelector(`[id="${CSS.escape(id)}"]`)?.classList.remove(PLAYING)
+    if (!keep.has(id)) root.querySelector(`[id="${CSS.escape(id)}"]`)?.classList.remove(PLAYING, LEFT_HAND)
   }
-  for (const id of next) root.querySelector(`[id="${CSS.escape(id)}"]`)?.classList.add(PLAYING)
+  for (const id of next) {
+    const el = root.querySelector(`[id="${CSS.escape(id)}"]`)
+    el?.classList.add(PLAYING)
+    el?.classList.toggle(LEFT_HAND, isLeftHand(id))
+  }
   return [...next]
 }
 

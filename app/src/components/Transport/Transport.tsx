@@ -106,6 +106,8 @@ export function Transport() {
             className={t.hands === h.value ? 'selected' : ''}
             onClick={() => setHands(h.value)}
           >
+            {h.value !== 'left' && <i className="hand-dot right" />}
+            {h.value !== 'right' && <i className="hand-dot left" />}
             {h.label}
           </button>
         ))}

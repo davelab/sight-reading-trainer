@@ -25,11 +25,16 @@
 .score-view g.note {
   cursor: pointer;
 }
-/* Playback cursor: notes currently sounding. */
+/* Playback cursor: notes currently sounding, coloured by hand. */
 .score-view g.note.playing,
 .score-view g.note.playing * {
-  fill: var(--cursor) !important;
-  stroke: var(--cursor) !important;
+  fill: var(--hand-right) !important;
+  stroke: var(--hand-right) !important;
+}
+.score-view g.note.playing.hand-left,
+.score-view g.note.playing.hand-left * {
+  fill: var(--hand-left) !important;
+  stroke: var(--hand-left) !important;
 }
 .score-empty {
   height: 100%;

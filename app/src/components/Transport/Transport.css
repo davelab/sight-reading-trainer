@@ -60,3 +60,21 @@
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
+.hand-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: 1px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6);
+}
+.hand-dot.right {
+  background: var(--hand-right);
+}
+.hand-dot.left {
+  background: var(--hand-left);
+}
+.hand-dot + .hand-dot {
+  margin-left: -3px;
+}

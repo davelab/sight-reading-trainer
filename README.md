@@ -30,7 +30,7 @@ sincronizzato, modalità "segui" via MIDI, analisi armonica e pattern ripetuti.
 | Modalità «Segui»: il cursore aspetta ogni accordo finché tutte le sue note sono suonate | `src-tauri/src/follow.rs` |
 | Rispetta mani (solo destra/sinistra) e loop A–B; ▶ esce dalla modalità e riparte da lì | `follow.rs`, `commands.rs` |
 | Esito per battuta (`follow:result {measure, correct, wrong}`): battute verdi o rosse, riepilogo in alto | `lib/overlay.ts`, `stores/midi.ts` |
-| Tastiera a schermo: note attese (giallo), suonate (blu), giuste/sbagliate (verde/rosso) | `components/Keyboard` |
+| Tastiera a schermo: note da suonare per mano (destra ambra, sinistra viola, anche in partitura) con un lampo a ogni nuovo attacco (note e accordi ripetuti), tasti suonati (blu), giuste/sbagliate (verde/rosso); altezza regolabile trascinando il bordo superiore | `components/Keyboard`, `lib/keyboardState.ts` |
 | Tastiera cliccabile: suona col synth e alimenta la modalità segui come un piano MIDI | comando `virtual_note` |
 
 Estensioni al contratto IPC della specifica: `playback:position` porta anche

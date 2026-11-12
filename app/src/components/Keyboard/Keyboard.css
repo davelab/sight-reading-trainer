@@ -1,40 +1,79 @@
-.keyboard {
+.keyboard-wrap {
   position: relative;
-  height: 64px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
   background: var(--chrome);
   border-top: 1px solid var(--border);
+}
+.keyboard-resize {
+  height: 7px;
+  cursor: ns-resize;
+  flex: none;
+  touch-action: none;
+}
+.keyboard-resize:hover {
+  background: var(--border);
+}
+.keyboard {
+  position: relative;
+  flex: 1;
 }
 .key {
   position: absolute;
   top: 0;
   box-sizing: border-box;
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+  transition: background-color 60ms linear;
 }
 .key.white {
   height: 100%;
   background: #fbfbfa;
   border: 1px solid #b9b9b4;
-  border-top: none;
-  border-radius: 0 0 3px 3px;
+  border-radius: 0 0 4px 4px;
 }
 .key.black {
-  height: 60%;
-  background: #222;
-  border-radius: 0 0 2px 2px;
+  height: 62%;
+  background: linear-gradient(#333, #161616);
+  border-radius: 0 0 3px 3px;
   z-index: 1;
 }
-.key.expected {
-  background: var(--cursor);
+/* Notes to play, by hand. */
+.key.lit {
+  box-shadow: inset 0 3px 5px rgb(0 0 0 / 0.25);
 }
+.key.lit.hand-right {
+  background: var(--hand-right);
+}
+.key.lit.hand-left {
+  background: var(--hand-left);
+}
+/* Keys held on the MIDI piano. */
 .key.played {
   background: var(--accent);
 }
-.key {
-  cursor: pointer;
-  touch-action: none;
-}
-.key.right {
+.key.correct {
   background: var(--ok);
 }
 .key.wrong {
   background: var(--err);
+}
+/* Every new attack: a short flash, so repeated notes are visible. */
+.key .strike {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #fff;
+  opacity: 0;
+  animation: key-strike 220ms ease-out;
+}
+@keyframes key-strike {
+  0% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
 }
