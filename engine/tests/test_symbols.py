@@ -141,3 +141,65 @@ def test_cross_staff_triplet_groups_are_repaired():
     assert check(xml) == []
     m3 = xml.split('<measure number="3">')[1]
     assert m3.count("<time-modification>") == 24
+
+
+def _measures(*lengths, signatures=()):
+    from fractions import Fraction
+
+    from score_engine.omr.symbols import Duration, Event, Measure
+
+    out = []
+    for i, length in enumerate(lengths):
+        m = Measure()
+        if length:
+            value = Fraction(length)
+            m.events.append(Event(Fraction(0), Duration(value, value, 0), 1, "C4", 0, "", ""))
+        if i in signatures:
+            m.time_denominator = signatures[i]
+        out.append(m)
+    return out
+
+
+def test_meter_changes_found_from_measure_lengths():
+    """I Giorni: 16 measures of 4/4, then 3/4 with no time signature read, a bar of
+    rest misread as 1/2, then cut time (homr reads the bottom number, 2)."""
+    from score_engine.omr.symbols import meter_regions
+
+    lengths = ["1"] * 16 + ["3/4"] * 20 + ["1/2"] + ["1"] * 6
+    regions = meter_regions(_measures(*lengths, signatures={0: 4, 37: 2}))
+    assert [(r.start, r.beats, r.beat_type) for r in regions] == [(0, 4, 4), (16, 3, 4), (37, 2, 2)]
+
+
+def test_a_lone_measure_or_pickup_does_not_change_the_meter():
+    from score_engine.omr.symbols import meter_regions
+
+    regions = meter_regions(_measures("1/4", "3/4", "3/4", "1/2", "3/4", "3/4", "3/4"))
+    assert [(r.start, r.beats, r.beat_type) for r in regions] == [(0, 3, 4)]
+    # Two measures of another length are not enough either; three are.
+    assert len(meter_regions(_measures("1", "1", "1", "3/4", "3/4", "1", "1"))) == 1
+    assert len(meter_regions(_measures("1", "1", "1", "3/4", "3/4", "3/4"))) == 2
+
+
+def test_eighth_note_meters():
+    from score_engine.omr.symbols import meter_regions
+
+    regions = meter_regions(_measures("3/4", "3/4", "3/4", "3/8", "3/8", "3/8", signatures={0: 4}))
+    assert [(r.beats, r.beat_type) for r in regions] == [(3, 4), (3, 8)]
+
+
+def test_page_start_keeps_the_meter_in_force():
+    """A page read on its own starts with 4/4 where the piece is in 2/2."""
+    from score_engine.omr.merge import merge_pages
+
+    def page(beats, beat_type):
+        return (
+            '<score-partwise version="4.0"><part-list><score-part id="P1"><part-name>P</part-name>'
+            '</score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>1'
+            f"</divisions><time><beats>{beats}</beats><beat-type>{beat_type}</beat-type></time>"
+            "</attributes><note><rest/><duration>4</duration><type>whole</type></note></measure>"
+            "</part></score-partwise>"
+        )
+
+    merged = merge_pages([page(2, 2), page(4, 4), page(3, 4)])
+    assert merged.count("<time>") == 2  # 2/2, then the real change to 3/4
+    assert "<beats>4</beats>" not in merged

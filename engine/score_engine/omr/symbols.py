@@ -16,7 +16,7 @@ Here the timing does not depend on those labels:
 Then each staff is split into voices again: notes with the same onset and
 duration form a chord, and each chord goes into the first voice free at its
 onset. The time signature's top number, which homr does not read, comes
-from the measures' actual length.
+from the measures' actual length, region by region (meter_regions).
 """
 
 from __future__ import annotations
@@ -345,14 +345,85 @@ def _divisions(measures: list[Measure]) -> int:
     return div
 
 
-def _beats(measures: list[Measure], denominator: int) -> int:
-    """Top number of the time signature: the most common measure length."""
-    lengths = Counter(m.length for m in measures if m.length > 0)
-    if not lengths:
-        return 4
-    common = lengths.most_common(1)[0][0]
-    beats = common * denominator
-    return beats.numerator if beats.denominator == 1 and beats.numerator > 0 else 4
+MIN_RUN = 3  # measures of a new length in a row that make a change of meter
+
+
+@dataclass(frozen=True)
+class MeterRegion:
+    start: int  # index of the first measure
+    length: Fraction  # in whole notes
+    beats: int
+    beat_type: int
+
+
+def _runs(lengths: list[Fraction]) -> list[tuple[int, int, Fraction]]:
+    """(start, count, length) of each run of equal lengths."""
+    runs: list[tuple[int, int, Fraction]] = []
+    for i, length in enumerate(lengths):
+        if runs and runs[-1][2] == length:
+            start, count, _ = runs[-1]
+            runs[-1] = (start, count + 1, length)
+        else:
+            runs.append((i, 1, length))
+    return runs
+
+
+def meter_regions(measures: list[Measure]) -> list[MeterRegion]:
+    """Where the meter changes, and to what.
+
+    homr reads where a time signature is printed but only its bottom number, and
+    sometimes misses it altogether. The measures' own lengths are reliable, so a
+    region of one meter starts at the first measure, at every time signature
+    homr saw, and wherever MIN_RUN measures in a row have a new length. A lone
+    measure of another length (a pickup, a bar of rest, a misread) stays in its
+    region and is reported by the check.
+    """
+    lengths = [m.length for m in measures]
+    forced = [0] + [i for i, m in enumerate(measures) if i > 0 and m.time_denominator]
+    starts: list[int] = []
+    for k, seg_start in enumerate(forced):
+        seg_end = forced[k + 1] if k + 1 < len(forced) else len(measures)
+        runs = [r for r in _runs(lengths[seg_start:seg_end]) if r[2] > 0]
+        if not runs:
+            starts.append(seg_start)
+            continue
+        long_runs = [r for r in runs if r[1] >= MIN_RUN]
+        common = Counter({r[2]: 0 for r in runs})
+        for r in runs:
+            common[r[2]] += r[1]
+        current = long_runs[0][2] if long_runs else common.most_common(1)[0][0]
+        starts.append(seg_start)
+        for start, _, length in long_runs:
+            if length != current:
+                starts.append(seg_start + start)
+                current = length
+    regions: list[MeterRegion] = []
+    beat_type = 4
+    for k, start in enumerate(starts):
+        end = starts[k + 1] if k + 1 < len(starts) else len(measures)
+        span = [x for x in lengths[start:end] if x > 0]
+        if not span:
+            length = regions[-1].length if regions else Fraction(1)
+        else:
+            counts = Counter(span)
+            # The region's own run decides: its first long run, else the commonest length.
+            run = next((r for r in _runs(lengths[start:end]) if r[1] >= MIN_RUN and r[2] > 0), None)
+            length = run[2] if run else counts.most_common(1)[0][0]
+        beat_type = measures[start].time_denominator or beat_type
+        bt = beat_type
+        while (length * bt).denominator != 1 and bt < 64:
+            bt *= 2
+        beats = length * bt
+        if beats.denominator != 1 or beats <= 0:
+            beats, bt = Fraction(4), 4
+        regions.append(MeterRegion(start, length, int(beats), bt))
+    # Neighbouring regions that ended up with the same meter are one.
+    merged: list[MeterRegion] = []
+    for r in regions:
+        if merged and (merged[-1].beats, merged[-1].beat_type) == (r.beats, r.beat_type):
+            continue
+        merged.append(r)
+    return merged
 
 
 def _note_element(e: Event, div: int, tuplet: str | None, show_number: bool = True) -> ET.Element:
@@ -449,10 +520,11 @@ def part_to_measures_xml(symbols: list[Symbol], part: ET.Element) -> None:
     measures, first_clefs = to_measures(symbols)
     staves = 2 if any(e.staff == 2 for m in measures for e in m.events) or 2 in first_clefs else 1
     first_voice = {1: 1, 2: 5}
-    denominator = next((m.time_denominator for m in measures if m.time_denominator), None)
-    beats = _beats(measures, denominator or 4)
-    if denominator:
-        repair_tuplets(measures, Fraction(beats, denominator))
+    regions = meter_regions(measures) if measures else []
+    for k, region in enumerate(regions):
+        end = regions[k + 1].start if k + 1 < len(regions) else len(measures)
+        repair_tuplets(measures[region.start : end], region.length)
+    time_at = {r.start: r for r in regions}
     for m in measures:
         assign_voices(m, first_voice)
     _mark_ties(measures)
@@ -469,18 +541,24 @@ def part_to_measures_xml(symbols: list[Symbol], part: ET.Element) -> None:
             ET.SubElement(attrs, "divisions").text = str(div)
             key = ET.SubElement(attrs, "key")
             ET.SubElement(key, "fifths").text = str(m.key or 0)
-            if denominator:
+            if 0 in time_at:
                 time = ET.SubElement(attrs, "time")
-                ET.SubElement(time, "beats").text = str(beats)
-                ET.SubElement(time, "beat-type").text = str(denominator)
+                ET.SubElement(time, "beats").text = str(time_at[0].beats)
+                ET.SubElement(time, "beat-type").text = str(time_at[0].beat_type)
             if staves == 2:
                 ET.SubElement(attrs, "staves").text = "2"
             for staff in sorted(first_clefs):
                 attrs.append(first_clefs[staff])
-        elif m.key is not None:
+        elif m.key is not None or number - 1 in time_at:
             attrs = ET.SubElement(el, "attributes")
-            key = ET.SubElement(attrs, "key")
-            ET.SubElement(key, "fifths").text = str(m.key)
+            if m.key is not None:
+                key = ET.SubElement(attrs, "key")
+                ET.SubElement(key, "fifths").text = str(m.key)
+            if number - 1 in time_at:
+                region = time_at[number - 1]
+                time = ET.SubElement(attrs, "time")
+                ET.SubElement(time, "beats").text = str(region.beats)
+                ET.SubElement(time, "beat-type").text = str(region.beat_type)
 
         voices: dict[int, list[Event]] = {}
         for e in sorted(m.events, key=lambda e: (e.onset, e.chord)):

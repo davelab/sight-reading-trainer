@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import copy
 import xml.etree.ElementTree as ET
+from fractions import Fraction
 from pathlib import Path
 
 ATTRIBUTE_ORDER = ["divisions", "key", "time", "staves", "part-symbol", "instruments", "clef"]
@@ -49,6 +50,8 @@ def merge_pages(pages: list[str]) -> str:
                 attrs = measure.find("attributes")
                 page_start = m_index == 0
                 if attrs is not None:
+                    if page_start and page_number > 0:
+                        _keep_running_meter(attrs, running)
                     _dedupe(attrs, running, clefs, keep_divisions=page_start)
                     if len(attrs) == 0:
                         measure.remove(attrs)
@@ -63,6 +66,26 @@ def merge_pages(pages: list[str]) -> str:
 
     body = ET.tostring(first, encoding="unicode")
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + body + "\n"
+
+
+def _quarters(time_sig: str | None) -> Fraction | None:
+    if time_sig is None:
+        return None
+    el = ET.fromstring(time_sig)
+    try:
+        return Fraction(int(el.findtext("beats", "0")) * 4, int(el.findtext("beat-type", "4")))
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+def _keep_running_meter(attrs: ET.Element, running: dict[str, str | None]) -> None:
+    """A page is read on its own: its first time signature is a guess when homr saw
+    none there. The same measure length as the meter in force (4/4 after 2/2) means
+    the meter goes on."""
+    time = attrs.find("time")
+    if time is not None and running["time"] is not None:
+        if _quarters(_signature(time)) == _quarters(running["time"]):
+            attrs.remove(time)
 
 
 def _dedupe(
