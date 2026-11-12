@@ -2,11 +2,13 @@
 //! Names and payloads must match app/src/lib/ipc.ts.
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::engine::EngineClient;
 use crate::midi::{self, NoteMessage};
 use crate::playback::{Hands, Loop, PlaybackEvent, MAX_TEMPO, MIN_TEMPO};
 use crate::score::{read_score, LoadedFile};
@@ -17,7 +19,11 @@ pub struct AppState {
     pub synth: SynthKind,
     pub soundfont: Option<PathBuf>,
     pub midi: Mutex<Option<midi::Connection>>,
+    pub analysis: Arc<EngineClient>,
 }
+
+/// Generous: music21 on a long piece can take tens of seconds.
+const ANALYSIS_TIMEOUT: Duration = Duration::from_secs(180);
 
 type CmdResult<T> = Result<T, String>;
 
@@ -204,9 +210,16 @@ pub fn virtual_note(app: AppHandle, state: State<'_, AppState>, pitch: u8, on: b
 
 // --- Planned for later milestones -------------------------------------------------
 
+/// Harmonic analysis by the Python engine. Returns the `Analysis` schema
+/// (shared/schema/Analysis.json) as JSON. Runs off the main thread.
 #[tauri::command]
-pub fn analyze() -> CmdResult<()> {
-    Err("analisi armonica: milestone M3".into())
+pub async fn analyze(state: State<'_, AppState>, musicxml: String) -> CmdResult<serde_json::Value> {
+    let client = state.analysis.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        client.request("analyze", serde_json::json!({ "musicxml": musicxml }), ANALYSIS_TIMEOUT)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

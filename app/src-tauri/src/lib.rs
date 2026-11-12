@@ -79,7 +79,15 @@ pub fn run() {
             let soundfont = synth::find_soundfont(&dirs);
             let (engine, status) = synth::start(soundfont);
             spawn_position_emitter(app.handle().clone(), engine.clone());
-            app.manage(AppState { engine, synth: status.kind, soundfont: status.soundfont, midi: Default::default() });
+            let analysis = std::sync::Arc::new(engine::EngineClient::new(engine::Launcher::locate()));
+            analysis.warm_up();
+            app.manage(AppState {
+                engine,
+                synth: status.kind,
+                soundfont: status.soundfont,
+                midi: Default::default(),
+                analysis,
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
