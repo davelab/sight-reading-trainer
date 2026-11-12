@@ -7,7 +7,7 @@ sincronizzato, modalità "segui" via MIDI, analisi armonica e pattern ripetuti.
 - Specifica completa: [`docs/SPEC.md`](docs/SPEC.md)
 - Istruzioni per Claude Code: [`CLAUDE.md`](CLAUDE.md)
 
-## Stato: milestone M2 — MIDI e modalità segui
+## Stato: milestone M3 — analisi armonica
 
 ### M1 — partitura e playback
 
@@ -40,8 +40,36 @@ Estensioni al contratto IPC della specifica: `playback:position` porta anche
 porta il numero di `measure`. Le note del piano MIDI non passano dal synth (il
 piano suona già da sé).
 
-Prossime: M3 (analisi armonica), M4 (pattern), M5 (OMR), M6 (packaging).
-Vedi la roadmap in `docs/SPEC.md`.
+### M3 — analisi armonica
+
+| Fatto | Dove |
+|---|---|
+| Sidecar Python avviato da Rust (uv in sviluppo, binario nell'app), JSON-RPC con timeout e riavvio | `src-tauri/src/engine.rs` |
+| Tonalità globale (Krumhansl-Schmuckler) e regioni di modulazione (finestre di 4 battute, conferma su 2) | `engine/score_engine/analysis/key.py` |
+| Un accordo per tempo: modelli pesati per durata, sigla, numero romano nella tonalità locale, dominanti secondarie, funzione | `analysis/harmony.py` |
+| Analisi automatica all'apertura, in background | `stores/analysis.ts`, comando `analyze` |
+| Numeri romani sotto il sistema (colori T/P/D), sigle sopra, tonalità a inizio regione, ancorati a (battuta, posizione) | `lib/analysisOverlay.ts` |
+| Barra con tonalità e regioni (numeri di battuta stampati) e interruttori | `components/AnalysisPanel` |
+
+**Criterio di uscita** («corale di Bach: accordi confrontati con un'analisi di
+riferimento»): `engine/tests/test_harmony.py` confronta, tempo per tempo, il
+corale BWV 269 con l'analisi umana di *When in Rome* (Andrew Jones, rivista da
+D. Tymoczko e H. Robb). Su 63 tempi: **90,5 %** stessa fondamentale e qualità,
+**88,9 %** anche stesso basso, **82,5 %** stessa tonalità locale.
+
+Su 9 corali di controllo mai usati per tarare l'algoritmo (Riemenschneider 2–10,
+523 tempi): **87,4 %** fondamentale e qualità, **85,1 %** con il basso,
+**67 %** tonalità locale. La tonalità è la parte più debole: gli analisti
+chiamano «tonalità» anche tonicizzazioni di 1–2 battute, mentre la finestra di
+4 battute le ignora o le sposta. Le impostazioni della specifica (4 battute,
+conferma su 2) sono risultate le migliori tra finestre 3–8 e conferme 1–3.
+
+Estensioni al contratto: `Chord.offset` (posizione in semiminime dall'inizio
+della battuta, per collocare l'annotazione con precisione); `measure` è
+l'ordinale della battuta nello spartito scritto (levare = 1, «7» e «7a»
+contano due), non il numero stampato.
+
+Prossime: M4 (pattern), M5 (OMR), M6 (packaging). Vedi la roadmap in `docs/SPEC.md`.
 
 ## Requisiti
 
@@ -72,7 +100,7 @@ funzionano, il playback no (serve il core Rust).
 | Lint | `pnpm lint`, `uv run ruff check`, `cargo clippy` |
 | Tipi dal contratto | `scripts/gen-types.sh` (dopo ogni modifica a `engine/score_engine/models.py`) |
 | Sidecar | `scripts/build-engine.sh` → `app/src-tauri/binaries/engine-<target>` |
-| Build app | `cd app && pnpm tauri build` |
+| Build app con sidecar | `cd app && pnpm bundle` |
 
 ## Test end-to-end manuale (criterio di uscita M1)
 
@@ -124,6 +152,24 @@ variante è stata eseguita in automatico su Linux (Xvfb + xdotool): battuta 1
 rossa con 1 errore, battuta 2 verde, cursore fermo su mi⁵ + do⁴ della battuta
 3, «11 giuste · 1 sbagliate · 92%». Il percorso midir con un piano vero va
 verificato sul Mac (nel container non c'è un sequencer MIDI).
+
+## Test end-to-end manuale (criterio di uscita M3)
+
+1. `cd engine && uv sync` (installa music21), poi
+   `uv run python -c "from music21 import corpus; corpus.parse('bach/bwv269').write('musicxml', fp='bwv269.musicxml')"`.
+2. `cd app && pnpm tauri dev` e apri `engine/bwv269.musicxml`.
+3. Per un paio di secondi la barra sotto gli strumenti dice «Analisi armonica
+   in corso…», poi mostra le tonalità con i numeri di battuta stampati.
+4. Sotto ogni sistema compaiono i numeri romani, con «G:» all'inizio, colorati
+   per funzione (blu tonica, verde predominante, arancio dominante), allineati
+   alle note. Battuta 6: I⁶ – ii⁶₅ – V; battuta 13, tempo 3: V⁷/IV.
+5. «Sigle» aggiunge G, D/F#… sopra i sistemi; ridimensionando la finestra le
+   annotazioni seguono la nuova impaginazione.
+6. Togli `uv` dal PATH (o rinomina `engine/`) e riapri: la barra dice
+   «Analisi non disponibile», con il motivo nel tooltip e «Riprova»; partitura
+   e playback funzionano lo stesso.
+
+Il passo 4 è stato verificato su Linux (Xvfb) con l'app vera e il sidecar via uv.
 
 ## Note di architettura
 
