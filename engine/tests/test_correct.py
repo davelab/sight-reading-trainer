@@ -87,3 +87,16 @@ def test_check_ignores_a_short_pickup_and_last_measure(xml):
     head, tail = xml.split("<note>", 1)
     shortened = head + tail.split("</note>", 1)[1]
     assert all(w.measure != 1 for w in check(shortened))
+
+
+def test_delete_inside_a_beamed_group_rebeams_the_voice(xml):
+    from score_engine.omr.beams import add_beams
+
+    beamed = add_beams(xml)
+    # Measure 1, right hand: D5 quarter, then G4 A4 | B4 C5 eighths (two beamed pairs).
+    out = apply_edit(beamed, NoteRef(1, 1, Fraction(3, 2), 69), "delete")  # A4
+    measure = out.split('<measure number="1">')[1].split("</measure>")[0]
+    assert measure.count('<beam number="1">begin</beam>') == measure.count(
+        '<beam number="1">end</beam>'
+    )
+    assert rh(out, 1) == ["D5", "G4", "rest", "B4", "C5"]

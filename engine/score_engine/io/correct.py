@@ -117,8 +117,21 @@ def apply_edit(musicxml: str, ref: NoteRef, action: EditAction) -> str:
     target = find_note(notes, ref)
     note = target.el
     if action == "delete":
+        # Drop the voice's beams and beam it again: removing a note from a
+        # beamed group must not leave a beam without its end.
+        for n in notes:
+            same_voice = (n.measure_el, n.ref.staff, n.voice) == (
+                target.measure_el,
+                target.ref.staff,
+                target.voice,
+            )
+            if same_voice:
+                for beam in n.el.findall("beam"):
+                    n.el.remove(beam)
         _delete(target, notes)
-        return _serialize(root)
+        from ..omr.beams import add_beams
+
+        return add_beams(_serialize(root))
     pitch = note.find("pitch")
     if pitch is None:
         raise EditError("si possono modificare solo le note, non le pause")

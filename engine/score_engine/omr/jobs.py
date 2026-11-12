@@ -23,6 +23,7 @@ from typing import Any
 from ..io.correct import check
 from ..models import OmrProgress, OmrResult, OmrWarning
 from .base import OmrBackend, OmrUnavailable
+from .beams import add_beams
 from .render import PdfError, page_count, render_pages
 
 log = logging.getLogger("score_engine.omr")
@@ -146,7 +147,7 @@ class OmrJobs:
         self._progress(job_id, "merge", total, total)
         out = work / "score.musicxml"
         merged = backend.merge(recognised, out) if len(recognised) > 1 else recognised[0]
-        musicxml = merged.read_text(encoding="utf-8")
+        musicxml = add_beams(merged.read_text(encoding="utf-8"))
         return OmrResult(
             jobId=job_id,
             musicxml=musicxml,
