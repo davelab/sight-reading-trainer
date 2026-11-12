@@ -10,6 +10,8 @@ dependencies = [
     "music21>=9.1",
     "homr[cpu]==0.7.1",  # pinned: omr/homr_backend.py patches its model paths
     "pypdfium2>=4",
+    "soundfile>=0.12",
+    "scipy>=1.11",
 ]
 
 [dependency-groups]
