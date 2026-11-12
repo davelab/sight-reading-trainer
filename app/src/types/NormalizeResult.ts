@@ -4,16 +4,16 @@
  * Result of ``score.normalize``.
  */
 export interface NormalizeResult {
-  musicxml: string
-  measures: number
-  parts: PartInfo[]
+  musicxml: string;
+  measures: number;
+  parts: PartInfo[];
 }
 /**
  * This interface was referenced by `NormalizeResult`'s JSON-Schema
  * via the `definition` "PartInfo".
  */
 export interface PartInfo {
-  id: string
-  name: string
-  staves: number
+  id: string;
+  name: string;
+  staves: number;
 }

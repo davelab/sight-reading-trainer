@@ -45,11 +45,7 @@ export function AnalysisPanel() {
       {status === 'done' && (
         <span className="analysis-keys">
           {keys.map((k, i) => (
-            <span
-              key={`${k.fromMeasure}-${k.tonic}-${k.mode}`}
-              className="key-chip"
-              title={`Affidabilità ${Math.round(k.confidence * 100)}%`}
-            >
+            <span key={`${k.fromMeasure}-${k.tonic}-${k.mode}`} className="key-chip" title={`Affidabilità ${Math.round(k.confidence * 100)}%`}>
               <strong>
                 {k.tonic} {MODE[k.mode]}
               </strong>
@@ -70,11 +66,7 @@ export function AnalysisPanel() {
           Numeri romani
         </label>
         <label>
-          <input
-            type="checkbox"
-            checked={display.symbols}
-            onChange={(e) => setDisplay({ symbols: e.target.checked })}
-          />
+          <input type="checkbox" checked={display.symbols} onChange={(e) => setDisplay({ symbols: e.target.checked })} />
           Sigle
         </label>
         <label>
@@ -87,11 +79,7 @@ export function AnalysisPanel() {
           Funzioni
         </label>
         <label>
-          <input
-            type="checkbox"
-            checked={display.patterns}
-            onChange={(e) => setDisplay({ patterns: e.target.checked })}
-          />
+          <input type="checkbox" checked={display.patterns} onChange={(e) => setDisplay({ patterns: e.target.checked })} />
           Pattern
         </label>
         {display.roman && display.functions && (

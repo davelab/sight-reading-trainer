@@ -7,17 +7,17 @@ export interface NoteRef {
   /**
    * Measure ordinal in the written score
    */
-  measure: number
+  measure: number;
   /**
    * Global staff number: staves of all parts in order
    */
-  staff: number
+  staff: number;
   /**
    * Onset in quarter notes from the downbeat
    */
-  offset: number
+  offset: number;
   /**
    * MIDI pitch
    */
-  pitch: number
+  pitch: number;
 }

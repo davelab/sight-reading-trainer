@@ -104,9 +104,7 @@ function romanText(chord: Chord, key: KeyRegion | null, x: number, y: number, si
   if (r.upper && r.lower) {
     // Stacked figured-bass digits: 6 over 5.
     t.appendChild(tspan(r.upper, { dy: String(-size * 0.45), 'font-size': String(size * 0.62) }))
-    t.appendChild(
-      tspan(r.lower, { dx: String(-size * 0.36), dy: String(size * 0.6), 'font-size': String(size * 0.62) })
-    )
+    t.appendChild(tspan(r.lower, { dx: String(-size * 0.36), dy: String(size * 0.6), 'font-size': String(size * 0.62) }))
     if (r.applied) t.appendChild(tspan(r.applied, { dy: String(-size * 0.15) }))
   } else {
     if (r.upper) t.appendChild(tspan(r.upper, { dy: String(-size * 0.45), 'font-size': String(size * 0.62) }))

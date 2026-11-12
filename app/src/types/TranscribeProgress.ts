@@ -4,10 +4,10 @@
  * Payload of the ``transcribe.progress`` notification.
  */
 export interface TranscribeProgress {
-  jobId: string
-  stage: 'load' | 'model' | 'notation'
+  jobId: string;
+  stage: "load" | "model" | "notation";
   /**
    * Progress of the current stage
    */
-  fraction: number
+  fraction: number;
 }
