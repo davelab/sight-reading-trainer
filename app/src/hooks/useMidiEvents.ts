@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { inTauri, onFollowResult, onMidiNote } from '../lib/ipc'
-import { useMidi } from '../stores/midi'
+import { inTauri, onFollowResult, onMidiNote, onTimedResult, onTimedSummary } from '../lib/ipc'
+import { timedRunStart, useMidi } from '../stores/midi'
+import { useTransport } from '../stores/transport'
 
 /** Mirror `midi:note` and `follow:result` into the MIDI store. */
 export function useMidiEvents(): void {
@@ -21,9 +22,16 @@ export function useMidiEvents(): void {
       const s = useMidi.getState()
       s.set({ results: { ...s.results, [r.measure]: r } })
     })
+    const offTimed = onTimedResult((r) => {
+      const s = useMidi.getState()
+      s.set({ timedResults: { ...s.timedResults, [r.measure]: r } })
+    })
+    const offSummary = onTimedSummary((summary) => {
+      const tempoPercent = useTransport.getState().tempoPercent
+      useMidi.getState().set({ timed: false, timedSummary: { ...summary, tempoPercent, fromMs: timedRunStart.ms } })
+    })
     return () => {
-      void offNote.then((fn) => fn())
-      void offResult.then((fn) => fn())
+      for (const off of [offNote, offResult, offTimed, offSummary]) void off.then((fn) => fn())
     }
   }, [])
 }

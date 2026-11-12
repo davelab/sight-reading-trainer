@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { inTauri, ipc, type Hands } from '../../lib/ipc'
 import { useView } from '../../stores/view'
+import { setMetronome } from '../../stores/practice'
 import { ViewSettings } from '../ViewSettings'
 import { useScore } from '../../stores/score'
 import { useTransport } from '../../stores/transport'
@@ -27,6 +28,7 @@ export function Transport() {
   const enabled = hasScore && inTauri
   const duration = t.info?.durationMs ?? 0
   const transpose = useView((s) => s.transpose)
+  const metronome = useView((s) => s.metronome)
   const setView = useView((s) => s.set)
   const [settings, setSettings] = useState(false)
   const [scrub, setScrub] = useState<number | null>(null)
@@ -84,6 +86,15 @@ export function Transport() {
         </button>
         <button className="play" disabled={!enabled} onClick={togglePlay} title="Play/pausa (spazio)">
           {t.playing ? '⏸' : '▶'}
+        </button>
+        <button
+          className={metronome ? 'selected' : ''}
+          disabled={!enabled}
+          aria-pressed={metronome}
+          onClick={() => void setMetronome(!metronome)}
+          title="Metronomo: un clic per movimento (accento sul primo) mentre la musica va"
+        >
+          𝅘𝅥 Metronomo
         </button>
         <span className="time">
           {formatTime(t.positionMs)} / {formatTime(duration)}

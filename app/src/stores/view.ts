@@ -22,7 +22,21 @@ export interface ViewSettings {
   pixelsPerSecond: number
   /** Semitones, -12..12. */
   transpose: number
+  /** Metronome clicks while the music plays (any mode). */
+  metronome: boolean
+  /** "A tempo" mode: one measure of clicks before the music. */
+  countIn: boolean
+  /** "A tempo" mode: how far from its time a note still counts as on time. */
+  tolerance: 'strict' | 'normal' | 'loose'
+  /** Cover the measure being played (and the next) to make the eyes read ahead. */
+  lookahead: 'off' | 'current' | 'next'
+  /** Reading aids on the score, to switch off one by one. */
+  aidNoteNames: boolean
+  aidIntervals: boolean
+  aidChordShapes: boolean
 }
+
+export const TOLERANCE_MS = { strict: 80, normal: 130, loose: 200 } as const
 
 export const DEFAULT_VIEW: ViewSettings = {
   mode: 'score',
@@ -37,7 +51,14 @@ export const DEFAULT_VIEW: ViewSettings = {
   volume: 0.5,
   reverb: 0.3,
   pixelsPerSecond: 160,
-  transpose: 0
+  transpose: 0,
+  metronome: false,
+  countIn: true,
+  tolerance: 'normal',
+  lookahead: 'off',
+  aidNoteNames: false,
+  aidIntervals: false,
+  aidChordShapes: false
 }
 
 const STORAGE_KEY = 'view-settings'

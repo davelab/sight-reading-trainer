@@ -92,3 +92,8 @@
 .transport .gear {
   font-size: 1.05rem;
 }
+.transport-group > button.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}

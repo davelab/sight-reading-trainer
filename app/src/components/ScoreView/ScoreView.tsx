@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { inTauri, ipc } from '../../lib/ipc'
 import { drawAnalysis, systemSpacingFor } from '../../lib/analysisOverlay'
 import { followCursor, highlightNotes, markMeasures, markSelected, markWarnings } from '../../lib/overlay'
+import { clearLookahead, drawAids, drawLookahead } from '../../lib/practiceOverlay'
+import { useView } from '../../stores/view'
 import { clearPatterns, drawPatterns } from '../../lib/patterns'
 import { renderPages, timeForNote } from '../../lib/verovio'
 import { useAnalysis } from '../../stores/analysis'
@@ -22,6 +24,14 @@ export function ScoreView() {
   const playing = useTransport((s) => s.playing)
   const following = useMidi((s) => s.following)
   const results = useMidi((s) => s.results)
+  const timedResults = useMidi((s) => s.timedResults)
+  const timed = useMidi((s) => s.timed)
+  const countingIn = useMidi((s) => s.countingIn)
+  const lookahead = useView((s) => s.lookahead)
+  const aidNoteNames = useView((s) => s.aidNoteNames)
+  const aidIntervals = useView((s) => s.aidIntervals)
+  const aidChordShapes = useView((s) => s.aidChordShapes)
+  const spellings = useScore((s) => s.spellings)
   const measures = useScore((s) => s.measures)
   const onsets = useScore((s) => s.onsets)
   const analysis = useAnalysis((s) => s.analysis)
@@ -38,7 +48,9 @@ export function ScoreView() {
   }, [events])
   const isLeftHand = useCallback((id: string) => leftHandIds.current.has(id), [])
   const [width, setWidth] = useState(0)
-  const spacingSystem = useAnalysis((s) => systemSpacingFor(s.display, s.analysis !== null))
+  const analysisSpacing = useAnalysis((s) => systemSpacingFor(s.display, s.analysis !== null))
+  // Room for the reading aids above and below the staves.
+  const spacingSystem = analysisSpacing + (aidNoteNames || aidIntervals || aidChordShapes ? 6 : 0)
   const [pages, setPages] = useState<string[]>([])
 
   // Track the container width, debounced, so the layout follows the window.
@@ -108,18 +120,45 @@ export function ScoreView() {
     markSelected(el, reviewing ? selectedNote : null)
   }, [reviewing, omrWarnings, selectedNote, measureIds, pages])
 
-  // Follow-mode results: green measures without mistakes, red with.
+  // Follow-mode results: green measures without mistakes, red with. "A tempo"
+  // results: green all on time, yellow some early or late, red wrong or missed notes.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const marks = Object.values(results).flatMap((r) => {
+    const follow = Object.values(results).flatMap((r) => {
       const m = measures[r.measure - 1]
       if (!m) return []
       const status = r.wrong === 0 ? ('ok' as const) : ('err' as const)
-      return [{ measureId: m.measureId, status, title: `Battuta ${r.measure}: ${r.correct} giuste, ${r.wrong} sbagliate` }]
+      return [
+        { measureId: m.measureId, status, title: `Battuta ${r.measure}: ${r.correct} giuste, ${r.wrong} sbagliate` }
+      ]
     })
-    markMeasures(el, marks)
-  }, [results, measures, pages])
+    const timedMarks = Object.values(timedResults).flatMap((r) => {
+      const m = measures[r.measure - 1]
+      if (!m) return []
+      const status =
+        r.wrong + r.missed > 0 ? ('err' as const) : r.early + r.late > 0 ? ('warn' as const) : ('ok' as const)
+      const title = `Battuta ${r.measure}: ${r.correct} a tempo, ${r.early} in anticipo, ${r.late} in ritardo, ${r.wrong} sbagliate, ${r.missed} mancate`
+      return [{ measureId: m.measureId, status, title }]
+    })
+    markMeasures(el, [...follow, ...timedMarks])
+  }, [results, timedResults, measures, pages])
+
+  // Look-ahead: cover the measure being played (and the next) while the music goes.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const active = lookahead !== 'off' && (playing || following || timed) && !countingIn
+    if (active) drawLookahead(el, currentNoteIds[0], lookahead === 'next')
+    else clearLookahead(el)
+  }, [currentNoteIds, lookahead, playing, following, timed, countingIn, pages])
+
+  // Reading aids, redrawn with the layout.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    drawAids(el, { noteNames: aidNoteNames, intervals: aidIntervals, chordShapes: aidChordShapes }, spellings, events)
+  }, [aidNoteNames, aidIntervals, aidChordShapes, spellings, events, pages])
 
   const onClick = async (e: React.MouseEvent) => {
     const note = (e.target as Element).closest('g.note')

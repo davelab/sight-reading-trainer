@@ -58,8 +58,8 @@ function staffBox(measure: SVGGraphicsElement): DOMRect | null {
 
 export interface MeasureMark {
   measureId: string
-  /** "ok" = no wrong notes, "err" = at least one. */
-  status: 'ok' | 'err'
+  /** "ok" = no mistakes, "warn" = timing only, "err" = wrong or missed notes. */
+  status: 'ok' | 'warn' | 'err'
   title: string
 }
 

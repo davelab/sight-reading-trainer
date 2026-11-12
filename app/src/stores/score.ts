@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Meter, Spelling } from '../lib/practice'
 import type { MeasureOnset, MeasureStart, PlaybackEvent } from '../lib/timemap'
 import type { NoteRef } from '../types'
 
@@ -14,6 +15,10 @@ export interface ScoreState {
   measureLabels: string[]
   /** Measure xml:id by ordinal - 1. */
   measureIds: string[]
+  /** Time signature by ordinal - 1 (metronome). */
+  meters: Meter[]
+  /** Written step and octave of every note id (note names, intervals). */
+  spellings: Map<string, Spelling>
   /** Verovio note id -> musical position (for corrections). */
   noteRefs: Map<string, NoteRef>
   loading: boolean
@@ -33,6 +38,8 @@ export const useScore = create<ScoreState>((set) => ({
   onsets: new Map(),
   measureLabels: [],
   measureIds: [],
+  meters: [],
+  spellings: new Map(),
   noteRefs: new Map(),
   loading: false,
   error: null,

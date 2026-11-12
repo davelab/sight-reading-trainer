@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { MeasureResult } from '../lib/ipc'
+import type { MeasureResult, TimedResult, TimedSummary } from '../lib/ipc'
 
 /** MIDI input and follow-mode state, mirrored from the Rust core. */
 export interface MidiState {
@@ -14,6 +14,12 @@ export interface MidiState {
   expectedPitches: number[]
   /** Latest result per measure index. */
   results: Record<number, MeasureResult>
+  /** "A tempo" mode is on, and counting in. */
+  timed: boolean
+  countingIn: boolean
+  /** "A tempo" results per measure index, and the totals of the last run with its tempo. */
+  timedResults: Record<number, TimedResult>
+  timedSummary: (TimedSummary & { tempoPercent: number; fromMs: number }) | null
   set: (patch: Partial<Omit<MidiState, 'set'>>) => void
 }
 
@@ -26,6 +32,10 @@ export const useMidi = create<MidiState>((set) => ({
   following: false,
   expectedPitches: [],
   results: {},
+  timed: false,
+  countingIn: false,
+  timedResults: {},
+  timedSummary: null,
   set: (patch) => set(patch)
 }))
 
@@ -39,3 +49,6 @@ export function followSummary(results: Record<number, MeasureResult>) {
   const total = correct + wrong
   return { correct, wrong, measures: Object.keys(results).length, accuracy: total ? correct / total : null }
 }
+
+/** Where the current "A tempo" run started (score ms), for «Riprova». */
+export const timedRunStart = { ms: 0 }

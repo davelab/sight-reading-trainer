@@ -16,6 +16,7 @@ import {
   type MeasureStart,
   type PlaybackEvent
 } from './timemap'
+import { metersFromMei, spellingsFromMei, type Meter, type Spelling } from './practice'
 
 let toolkitPromise: Promise<VerovioToolkit> | null = null
 
@@ -40,6 +41,10 @@ export interface LoadedScore {
   measureLabels: string[]
   /** Measure xml:id by ordinal - 1. */
   measureIds: string[]
+  /** Time signature by ordinal - 1. */
+  meters: Meter[]
+  /** Written step and octave of every note id. */
+  spellings: Map<string, Spelling>
 }
 
 export async function loadScore(musicxml: string): Promise<LoadedScore> {
@@ -59,7 +64,9 @@ export async function loadScore(musicxml: string): Promise<LoadedScore> {
   })
   const measures = measureStarts(timemap)
   return { events: assignMeasures(events, measures), measures, onsets: measureOnsets(timemap), measureLabels: measureLabelsFromMei(mei),
-    measureIds: measureIdsFromMei(mei)
+    measureIds: measureIdsFromMei(mei),
+    meters: metersFromMei(mei),
+    spellings: spellingsFromMei(mei)
   }
 }
 

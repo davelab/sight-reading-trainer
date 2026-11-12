@@ -45,12 +45,37 @@ export interface PlaybackPosition {
   following: boolean
   /** Pitches of the current chord still to play (follow mode). */
   expectedPitches: number[]
+  /** "A tempo" mode is on. */
+  timed: boolean
+  /** The metronome counts in before the music. */
+  countingIn: boolean
 }
 
 export interface MidiNote {
   pitch: number
   velocity: number
   on: boolean
+}
+
+/** "A tempo" mode: what happened in one measure (src-tauri/src/timed.rs). */
+export interface TimedResult {
+  measure: number
+  correct: number
+  early: number
+  late: number
+  wrong: number
+  missed: number
+}
+
+export interface TimedSummary {
+  correct: number
+  early: number
+  late: number
+  wrong: number
+  missed: number
+  expected: number
+  meanOffsetMs: number
+  measures: number
 }
 
 export interface MeasureResult {
@@ -102,6 +127,13 @@ export const ipc = {
   /** Whether a Claude API key is in the Keychain (the key never comes back). */
   apiKeyStatus: () => invoke<boolean>('api_key_status'),
   setApiKey: (key: string | null) => invoke<void>('set_api_key', { key }),
+  /** Metronome beats (score ms) of the loaded score. */
+  setClicks: (clicks: { ms: number; accent: boolean }[]) => invoke<void>('set_clicks', { clicks }),
+  setMetronome: (enabled: boolean) => invoke<void>('set_metronome', { enabled }),
+  /** "A tempo" mode from the current position; results arrive as timed:* events. */
+  startTimedMode: (toleranceMs: number, countIn: { beats: number; beatMs: number } | null) =>
+    invoke<void>('start_timed_mode', { toleranceMs, countIn }),
+  stopTimedMode: () => invoke<void>('stop_timed_mode'),
   /** Start transcribing a piano recording; progress and result arrive as transcribe:* events. */
   transcribeAudio: (path: string, hints: TranscribeHints = {}) =>
     invoke<{ jobId: string }>('transcribe_audio', { path, hints }),
@@ -164,6 +196,14 @@ export function onPlaybackPosition(cb: (p: PlaybackPosition) => void): Promise<U
 
 export function onMidiNote(cb: (n: MidiNote) => void): Promise<UnlistenFn> {
   return listen<MidiNote>('midi:note', (e) => cb(e.payload))
+}
+
+export function onTimedResult(cb: (r: TimedResult) => void): Promise<UnlistenFn> {
+  return listen<TimedResult>('timed:result', (e) => cb(e.payload))
+}
+
+export function onTimedSummary(cb: (s: TimedSummary) => void): Promise<UnlistenFn> {
+  return listen<TimedSummary>('timed:summary', (e) => cb(e.payload))
 }
 
 export function onFollowResult(cb: (r: MeasureResult) => void): Promise<UnlistenFn> {

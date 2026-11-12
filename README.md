@@ -114,6 +114,15 @@ tempo, altezza), mai per ID. Il controllo automatico segnala solo le battute
 la cui durata non torna con il tempo in chiave: le altezze sbagliate (come i
 diesis persi) vanno viste confrontando con il PDF.
 
+### Lettura a prima vista
+
+| Fatto | Dove |
+|---|---|
+| **Metronomo** (pulsante in basso, in ogni modalità): un clic per movimento, accento sul primo; battute composte (6/8, 12/8) in semiminime puntate; anacrusi contate dalla fine | `playback.rs` (canale 10 GM, wood block), `lib/practice.ts` |
+| **«A tempo»**: la musica va avanti al tempo scelto anche se sbagli, dopo una battuta di conteggio; ogni nota è a tempo, in anticipo, in ritardo, sbagliata o mancata (tolleranza stretta/normale/larga, scalata col tempo); la mano che non suoni la suona l'app; battute verdi, gialle (solo tempo) o rosse; alla fine il riepilogo e il tempo da provare dopo | `src-tauri/src/timed.rs`, `components/Practice`, `stores/practice.ts` |
+| **Lettura anticipata**: copre la battuta che stai suonando (o anche la successiva), così gli occhi devono stare avanti | `lib/practiceOverlay.ts` |
+| **Aiuti da togliere gradualmente** (⚙︎ → Lettura a prima vista; preset Tutti / Senza nomi / Nessuno): nomi delle note, salti della melodia dalla terza in su (3↑, 5↓), forme degli accordi (fond., 1°/2° rivolto, 7ª) | `lib/practiceOverlay.ts`, `lib/practice.ts` |
+
 ### Etichette degli accordi (impostazione)
 
 Nel pannello dell'analisi: «Accordi» mostra o nasconde la riga sotto ogni

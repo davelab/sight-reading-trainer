@@ -58,6 +58,32 @@
   fill: var(--ok);
   fill-opacity: 0.14;
 }
+.score-view rect.follow-mark.warn {
+  fill: #e0a800;
+  fill-opacity: 0.18;
+}
+.score-view rect.lookahead-mask {
+  fill: var(--paper);
+  fill-opacity: 0.94;
+  pointer-events: none;
+}
+.score-view text.reading-aid {
+  font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  pointer-events: none;
+}
+.score-view text.aid-name {
+  fill: #6b6a66;
+  font-weight: 600;
+}
+.score-view text.aid-interval {
+  fill: var(--accent);
+  font-weight: 700;
+}
+.score-view text.aid-shape {
+  fill: #2a8a3e;
+  font-weight: 700;
+  font-style: italic;
+}
 .score-view rect.follow-mark.err {
   fill: var(--err);
   fill-opacity: 0.16;

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { AnalysisPanel } from './components/AnalysisPanel'
 import { ClaudeKeyDialog } from './components/ClaudeKey'
+import { TimedSummaryCard } from './components/Practice'
 import { FallingNotes } from './components/FallingNotes'
 import { Keyboard } from './components/Keyboard'
 import { MidiPanel } from './components/MidiPanel'
@@ -153,6 +154,7 @@ export default function App() {
         )}
       </main>
       <OmrProgress />
+      <TimedSummaryCard />
       <TranscribeSetup />
       <ClaudeKeyDialog />
       <Keyboard />

@@ -1,5 +1,6 @@
 import { inTauri, ipc } from './ipc'
 import { buildNoteRefs } from './noteRefs'
+import { metronomeClicks } from './practice'
 import { scoreDurationMs } from './timemap'
 import { loadScore } from './verovio'
 import { runAnalysis, useAnalysis } from '../stores/analysis'
@@ -41,7 +42,7 @@ export async function openMusicXml(
   { analyze = true, keepTransport = false }: OpenOptions = {}
 ): Promise<void> {
   const score = useScore.getState()
-  const { events, measures, onsets, measureLabels, measureIds } = await loadScore(musicxml)
+  const { events, measures, onsets, measureLabels, measureIds, meters, spellings } = await loadScore(musicxml)
   score.set({
     fileName,
     title: title ?? titleFromXml(musicxml) ?? fileName,
@@ -51,6 +52,8 @@ export async function openMusicXml(
     onsets,
     measureLabels,
     measureIds,
+    meters,
+    spellings,
     noteRefs: buildNoteRefs(onsets, measureIds, events),
     error: null
   })
@@ -62,20 +65,32 @@ export async function openMusicXml(
   if (keepTransport && inTauri) {
     transport.set({ loop: null, pendingLoopStart: null }) // loading clears the loop in Rust
     await ipc.playbackLoad(events)
-    await Promise.all([ipc.setTempo(transport.tempoPercent), ipc.setHands(transport.hands)])
+    await Promise.all([ipc.setTempo(transport.tempoPercent), ipc.setHands(transport.hands), sendClicks()])
     return
   }
   transport.set({ playing: false, positionMs: 0, currentNoteIds: [], loop: null, pendingLoopStart: null })
   // A new piece starts in its written key; the other view settings stay as chosen.
   if (useView.getState().transpose !== 0) useView.getState().set({ transpose: 0 })
-  useMidi.getState().set({ following: false, expectedPitches: [], results: {} })
+  useMidi.getState().set({ following: false, expectedPitches: [], results: {}, timedResults: {}, timedSummary: null })
   if (!inTauri) {
     transport.set({ info: { durationMs: scoreDurationMs(events), synth: 'none', soundfontName: null } })
     return
   }
   const info = await ipc.playbackLoad(events)
-  await Promise.all([ipc.setTempo(transport.tempoPercent), ipc.setHands(transport.hands), ipc.setLoop(null)])
+  await Promise.all([
+    ipc.setTempo(transport.tempoPercent),
+    ipc.setHands(transport.hands),
+    ipc.setLoop(null),
+    sendClicks()
+  ])
   transport.set({ info })
+}
+
+/** Metronome beats of the loaded score, and the metronome switch, to the Rust core. */
+async function sendClicks(): Promise<void> {
+  const { measures, measureIds, meters, events } = useScore.getState()
+  await ipc.setClicks(metronomeClicks(measures, measureIds, meters, scoreDurationMs(events)))
+  await ipc.setMetronome(useView.getState().metronome)
 }
 
 async function withLoading(task: () => Promise<void>): Promise<void> {
