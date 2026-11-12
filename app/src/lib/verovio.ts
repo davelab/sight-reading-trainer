@@ -58,11 +58,7 @@ export async function loadScore(musicxml: string): Promise<LoadedScore> {
     return { pitch: midi.pitch, durMs: midi.duration, staff: staffs.get(id) ?? 1 }
   })
   const measures = measureStarts(timemap)
-  return {
-    events: assignMeasures(events, measures),
-    measures,
-    onsets: measureOnsets(timemap),
-    measureLabels: measureLabelsFromMei(mei),
+  return { events: assignMeasures(events, measures), measures, onsets: measureOnsets(timemap), measureLabels: measureLabelsFromMei(mei),
     measureIds: measureIdsFromMei(mei)
   }
 }

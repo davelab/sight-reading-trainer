@@ -116,9 +116,7 @@ export function ScoreView() {
       const m = measures[r.measure - 1]
       if (!m) return []
       const status = r.wrong === 0 ? ('ok' as const) : ('err' as const)
-      return [
-        { measureId: m.measureId, status, title: `Battuta ${r.measure}: ${r.correct} giuste, ${r.wrong} sbagliate` }
-      ]
+      return [{ measureId: m.measureId, status, title: `Battuta ${r.measure}: ${r.correct} giuste, ${r.wrong} sbagliate` }]
     })
     markMeasures(el, marks)
   }, [results, measures, pages])
