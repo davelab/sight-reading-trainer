@@ -66,6 +66,11 @@ pub enum MidiAction {
     NoteOff { channel: u8, key: u8 },
 }
 
+/// `pitch + semitones`, or None outside the MIDI range.
+pub fn transposed(pitch: u8, semitones: i8) -> Option<u8> {
+    u8::try_from(i16::from(pitch) + i16::from(semitones)).ok().filter(|p| *p <= 127)
+}
+
 /// Staff → MIDI channel. Channel 9 (drums in General MIDI) is never used.
 fn channel_for_staff(staff: u8) -> u8 {
     staff.saturating_sub(1).min(8)
@@ -88,6 +93,8 @@ pub struct Transport {
     playing: bool,
     loop_range: Option<Loop>,
     hands: Hands,
+    /// Semitones added to every note played (keyboard practice in another key).
+    transpose: i8,
     /// Index of the next event whose onset has not been dispatched yet.
     next: usize,
     sounding: Vec<Sounding>,
@@ -110,6 +117,7 @@ impl Transport {
             playing: false,
             loop_range: None,
             hands: Hands::Both,
+            transpose: 0,
             next: 0,
             sounding: Vec::with_capacity(64),
         }
@@ -186,6 +194,16 @@ impl Transport {
         }
     }
 
+    /// Transpose by `semitones` (-24..=24). Sounding notes are released first,
+    /// so none is left hanging at its old pitch.
+    pub fn set_transpose(&mut self, semitones: i8, out: &mut Vec<MidiAction>) {
+        let semitones = semitones.clamp(-24, 24);
+        if semitones != self.transpose {
+            self.release_all(out);
+            self.transpose = semitones;
+        }
+    }
+
     /// Advance by `real_ms` of wall-clock time, pushing the MIDI actions due.
     /// Returns true when playback reached the end of the score in this call.
     pub fn advance(&mut self, real_ms: f64, out: &mut Vec<MidiAction>) -> bool {
@@ -256,7 +274,8 @@ impl Transport {
             if !self.hands.plays(e.staff) {
                 continue;
             }
-            let (channel, key) = (channel_for_staff(e.staff), e.pitch);
+            let Some(key) = transposed(e.pitch, self.transpose) else { continue };
+            let channel = channel_for_staff(e.staff);
             if let Some(i) = self.sounding.iter().position(|s| s.channel == channel && s.key == key) {
                 self.sounding.swap_remove(i);
                 out.push(MidiAction::NoteOff { channel, key });
@@ -401,6 +420,22 @@ mod tests {
         t.play();
         t.advance(550.0, &mut out);
         assert_eq!(out, vec![on(60, 0), NoteOff { channel: 0, key: 60 }, on(60, 0)]);
+    }
+
+    #[test]
+    fn transpose_shifts_played_keys_and_releases_old_ones() {
+        let mut t = transport();
+        let mut out = Vec::new();
+        t.play();
+        t.advance(10.0, &mut out);
+        out.clear();
+        t.set_transpose(2, &mut out);
+        assert_eq!(out.len(), 2, "D5 and G3 released at their old pitch");
+        out.clear();
+        t.advance(500.0, &mut out); // G4 at 500 ms, two semitones up
+        assert!(out.contains(&on(69, 0)));
+        assert_eq!(transposed(127, 1), None);
+        assert_eq!(transposed(0, -1), None);
     }
 
     #[test]

@@ -148,6 +148,24 @@ pub fn set_hands(state: State<'_, AppState>, hands: Hands) -> CmdResult<()> {
     })
 }
 
+/// Output volume, 0.0–1.0.
+#[tauri::command]
+pub fn set_volume(state: State<'_, AppState>, volume: f32) -> CmdResult<()> {
+    with_engine(&state, |e| e.set_volume(volume))
+}
+
+/// Reverb amount, 0.0–1.0.
+#[tauri::command]
+pub fn set_reverb(state: State<'_, AppState>, amount: f32) -> CmdResult<()> {
+    with_engine(&state, |e| e.set_reverb(amount))
+}
+
+/// Transpose playback and follow mode, in semitones (-24..=24).
+#[tauri::command]
+pub fn set_transpose(state: State<'_, AppState>, semitones: i8) -> CmdResult<()> {
+    with_engine(&state, |e| e.set_transpose(semitones))
+}
+
 /// Turn follow (wait) mode on or off. On: playback stops and the cursor waits
 /// on the first chord at or after the current position.
 #[tauri::command]

@@ -39,6 +39,8 @@ pub struct Follow {
     matched: Vec<u8>,
     current: Option<MeasureResult>,
     loop_range: Option<Loop>,
+    /// The player plays the score transposed by this many semitones.
+    transpose: i8,
 }
 
 fn build_steps(events: &[PlaybackEvent], hands: Hands) -> Vec<Step> {
@@ -82,6 +84,11 @@ impl Follow {
         if let Some(ms) = at {
             self.seek(ms);
         }
+    }
+
+    pub fn set_transpose(&mut self, semitones: i8) {
+        self.transpose = semitones;
+        self.matched.clear();
     }
 
     pub fn set_loop(&mut self, range: Option<Loop>) {
@@ -137,14 +144,22 @@ impl Follow {
     /// Pitches the player must still play in the current chord.
     pub fn expected_pitches(&self) -> Vec<u8> {
         match (self.active, self.steps.get(self.idx)) {
-            (true, Some(s)) => s.pitches.iter().copied().filter(|p| !self.matched.contains(p)).collect(),
+            (true, Some(s)) => s
+                .pitches
+                .iter()
+                .copied()
+                .filter(|p| !self.matched.contains(p))
+                .filter_map(|p| crate::playback::transposed(p, self.transpose))
+                .collect(),
             _ => Vec::new(),
         }
     }
 
     /// Handle a played note. Returns the results of the measures completed by it.
-    pub fn note_on(&mut self, pitch: u8) -> Vec<MeasureResult> {
+    pub fn note_on(&mut self, played: u8) -> Vec<MeasureResult> {
         let mut done = Vec::new();
+        // Compare in the score's key.
+        let Some(pitch) = crate::playback::transposed(played, -self.transpose) else { return done };
         if !self.active {
             return done;
         }
@@ -235,6 +250,17 @@ mod tests {
         assert_eq!(done, vec![MeasureResult { measure: 2, correct: 1, wrong: 0 }]);
         assert!(!f.is_active(), "finished at the end of the score");
         assert!(f.expected_note_ids().is_empty());
+    }
+
+    #[test]
+    fn transposed_practice_expects_transposed_keys() {
+        let mut f = follow();
+        f.set_transpose(-2);
+        assert_eq!(f.expected_pitches(), vec![72, 53]); // D5 G3 played a tone lower
+        f.note_on(74); // the untransposed key is now wrong
+        f.note_on(72);
+        f.note_on(53);
+        assert_eq!(f.current_onset(), Some(500.0));
     }
 
     #[test]

@@ -26,7 +26,15 @@ pub trait Synth: Send {
     fn apply(&mut self, action: MidiAction);
     /// Render `left.len()` frames, overwriting both buffers.
     fn render(&mut self, left: &mut [f32], right: &mut [f32]);
+    /// Output level, 0.0–1.0 (0.5 is the synth's default level).
+    fn set_volume(&mut self, volume: f32);
+    /// Reverb amount, 0.0–1.0 (ignored by synths without reverb).
+    fn set_reverb(&mut self, _amount: f32) {}
 }
+
+/// Default levels, as the UI starts.
+pub const DEFAULT_VOLUME: f32 = 0.5;
+pub const DEFAULT_REVERB: f32 = 0.3;
 
 // --- SoundFont synth ------------------------------------------------------------
 
@@ -57,6 +65,17 @@ impl Synth for SoundFontSynth {
     fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
         self.synth.render(left, right);
     }
+
+    fn set_volume(&mut self, volume: f32) {
+        self.synth.set_master_volume(volume.clamp(0.0, 1.0));
+    }
+
+    fn set_reverb(&mut self, amount: f32) {
+        let send = (amount.clamp(0.0, 1.0) * 127.0).round() as i32;
+        for channel in 0..16 {
+            self.synth.process_midi_message(channel, 0xB0, 0x5B, send); // CC 91: reverb send
+        }
+    }
 }
 
 // --- Fallback synth -------------------------------------------------------------
@@ -76,13 +95,14 @@ struct Voice {
 pub struct FallbackSynth {
     sample_rate: f32,
     voices: Vec<Voice>,
+    gain: f32,
 }
 
 const MAX_VOICES: usize = 48;
 
 impl FallbackSynth {
     pub fn new(sample_rate: u32) -> Self {
-        Self { sample_rate: sample_rate as f32, voices: Vec::with_capacity(MAX_VOICES) }
+        Self { sample_rate: sample_rate as f32, voices: Vec::with_capacity(MAX_VOICES), gain: 1.0 }
     }
 }
 
@@ -127,11 +147,15 @@ impl Synth for FallbackSynth {
                 v.age += dt;
                 v.level *= if v.released { release } else { decay };
             }
-            let out = s.tanh();
+            let out = (s * self.gain).tanh();
             *l = out;
             *r = out;
         }
         self.voices.retain(|v| v.level > 1e-4);
+    }
+
+    fn set_volume(&mut self, volume: f32) {
+        self.gain = volume.clamp(0.0, 1.0) / DEFAULT_VOLUME;
     }
 }
 
@@ -175,6 +199,24 @@ impl Engine {
         let result = f(&mut self.transport, &mut self.actions);
         self.flush();
         result
+    }
+
+    pub fn set_volume(&mut self, volume: f32) {
+        if let Some(s) = self.synth.as_mut() {
+            s.set_volume(volume);
+        }
+    }
+
+    pub fn set_reverb(&mut self, amount: f32) {
+        if let Some(s) = self.synth.as_mut() {
+            s.set_reverb(amount);
+        }
+    }
+
+    /// Transpose playback and follow mode by `semitones`.
+    pub fn set_transpose(&mut self, semitones: i8) {
+        self.with_transport(|t, out| t.set_transpose(semitones, out));
+        self.follow.set_transpose(semitones);
     }
 
     /// Sound a note played live (on-screen keyboard), outside the transport.
@@ -287,6 +329,9 @@ fn open_output(soundfont: Option<&Path>) -> Result<(SharedEngine, AudioStatus, c
             }
         };
 
+    let mut synth = synth;
+    synth.set_volume(DEFAULT_VOLUME);
+    synth.set_reverb(DEFAULT_REVERB);
     let engine = Arc::new(Mutex::new(Engine::new(Some(synth))));
     let cb_engine = engine.clone();
     let stream = device
