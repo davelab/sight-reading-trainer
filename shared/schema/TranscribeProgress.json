@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "description": "Payload of the ``transcribe.progress`` notification.",
+  "properties": {
+    "jobId": {
+      "type": "string"
+    },
+    "stage": {
+      "enum": [
+        "load",
+        "model",
+        "notation"
+      ],
+      "type": "string"
+    },
+    "fraction": {
+      "description": "Progress of the current stage",
+      "maximum": 1,
+      "minimum": 0,
+      "type": "number"
+    }
+  },
+  "required": [
+    "jobId",
+    "stage",
+    "fraction"
+  ],
+  "title": "TranscribeProgress",
+  "type": "object"
+}

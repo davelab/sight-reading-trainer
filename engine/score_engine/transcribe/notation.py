@@ -254,9 +254,10 @@ def to_score(
         part.insert(0, key.KeySignature(detected.sharps))
     _spell(score, detected)
     score = score.makeNotation()
-    if pedals:
-        _add_pedals(score, pedals, beats, first_downbeat - float(pickup))
     xml = GeneralObjectExporter(score).parse().decode("utf-8")
+    if pedals:
+        origin = first_downbeat - float(pickup)
+        xml = add_pedal_marks(xml, pedals, beats, origin, meter_beats, float(pickup))
     facts = {
         "tempo": round(bpm),
         "beatsPerMeasure": meter_beats,
@@ -286,17 +287,77 @@ def _spell(score, k) -> None:  # noqa: ANN001
                 p.name, p.octave = alt.name, alt.octave
 
 
-def _add_pedals(score, pedals: list[PedalEvent], beats: np.ndarray, origin: float) -> None:  # noqa: ANN001
-    """Sustain pedal as <pedal> marks under the left hand (Ped. ... *)."""
-    from music21 import expressions
+def add_pedal_marks(
+    xml: str,
+    pedals: list[PedalEvent],
+    beats: np.ndarray,
+    origin: float,
+    meter: int,
+    pickup: float,
+) -> str:
+    """Sustain pedal as MusicXML <pedal> directions (Ped. ... *) under the left hand.
+    `origin` is the beat coordinate of the score's start; a pickup measure, if any,
+    is `pickup` beats long."""
+    import xml.etree.ElementTree as ET
 
-    left = score.parts[-1]
+    root = ET.fromstring(xml.encode("utf-8"))
+    part = root.find("part")
+    if part is None:
+        return xml
+    measures = part.findall("measure")
+    divisions = 1
+    for m in measures:
+        d = m.find("attributes/divisions")
+        if d is not None and d.text:
+            divisions = int(d.text)
+            break
+    staves = root.find(".//attributes/staves")
+    staff = staves.text if staves is not None and staves.text else None
+
+    def place(t: float) -> tuple[int, float] | None:
+        b = float(to_beats(np.array([t]), beats)[0]) - origin
+        if b < -0.5:
+            return None
+        b = max(0.0, b)  # pressed just before the first note
+        if pickup > 0:
+            if b < pickup:
+                return 0, b
+            b -= pickup
+            index = 1 + int(b // meter)
+        else:
+            index = int(b // meter)
+        return index, b - (index - (1 if pickup > 0 else 0)) * meter
+
+    marks: dict[int, list[tuple[float, str]]] = defaultdict(list)
     for ped in pedals:
-        start = float(to_beats(np.array([ped.onset]), beats)[0]) - origin
-        stop = float(to_beats(np.array([ped.offset]), beats)[0]) - origin
-        if stop <= start or start < 0:
+        start, stop = place(ped.onset), place(ped.offset)
+        if start is None or stop is None or start[0] >= len(measures):
             continue
-        on = left.flatten().getElementAtOrBefore(start, classList=["GeneralNote"])
-        off = left.flatten().getElementAtOrBefore(stop, classList=["GeneralNote"])
-        if on is not None and off is not None and on is not off:
-            left.insert(0, expressions.PedalMark(on, off))
+        marks[start[0]].append((start[1], "start"))
+        if stop[0] < len(measures):
+            marks[stop[0]].append((stop[1], "stop"))
+        else:
+            last = len(measures) - 1
+            length = meter if last or not pickup else pickup
+            marks[last].append((float(length), "stop"))
+    for index, items in marks.items():
+        measure = measures[index]
+        at = 0
+        for k, child in enumerate(list(measure)):
+            if child.tag not in ("attributes", "print", "direction"):
+                at = k
+                break
+        else:
+            at = len(measure)
+        for offset, kind in sorted(items, reverse=True):
+            d = ET.Element("direction", placement="below")
+            pedal = ET.SubElement(ET.SubElement(d, "direction-type"), "pedal", type=kind, line="no")
+            pedal.set("sign", "yes")
+            if offset > 0:
+                ET.SubElement(d, "offset", sound="yes").text = str(round(offset * divisions))
+            if staff:
+                ET.SubElement(d, "staff").text = staff
+            ET.SubElement(d, "sound", **{"damper-pedal": "yes" if kind == "start" else "no"})
+            measure.insert(at, d)
+    head = xml[: xml.index("<score-partwise")]
+    return head + ET.tostring(root, encoding="unicode")

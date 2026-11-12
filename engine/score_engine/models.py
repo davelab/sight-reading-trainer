@@ -163,6 +163,37 @@ class OmrProgress(_Model):
     total: int = Field(ge=0)
 
 
+class TranscribeFacts(_Model):
+    """What the transcription inferred about the performance."""
+
+    tempo: int = Field(ge=1, description="Median beat, in quarter notes per minute")
+    beats_per_measure: int = Field(alias="beatsPerMeasure", ge=1)
+    key: str = Field(description="e.g. 'G major', 'Bb minor'")
+    pickup_beats: float = Field(alias="pickupBeats", ge=0)
+
+
+class TranscribeResult(_Model):
+    """Payload of the ``transcribe.done`` notification."""
+
+    job_id: str = Field(alias="jobId")
+    musicxml: str
+    midi: str = Field(
+        description="The performance as played (with pedal), base64 Standard MIDI File"
+    )
+    duration: float = Field(ge=0, description="Seconds of audio")
+    notes: int = Field(ge=0, description="Notes detected")
+    facts: TranscribeFacts
+    warnings: list[OmrWarning]
+
+
+class TranscribeProgress(_Model):
+    """Payload of the ``transcribe.progress`` notification."""
+
+    job_id: str = Field(alias="jobId")
+    stage: Literal["load", "model", "notation"]
+    fraction: float = Field(ge=0, le=1, description="Progress of the current stage")
+
+
 EXPORTED_MODELS: dict[str, type[BaseModel]] = {
     "Analysis": Analysis,
     "PingResult": PingResult,
@@ -171,4 +202,6 @@ EXPORTED_MODELS: dict[str, type[BaseModel]] = {
     "CheckResult": CheckResult,
     "OmrResult": OmrResult,
     "OmrProgress": OmrProgress,
+    "TranscribeResult": TranscribeResult,
+    "TranscribeProgress": TranscribeProgress,
 }

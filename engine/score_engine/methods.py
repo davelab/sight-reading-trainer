@@ -51,6 +51,19 @@ def jobs():
     return _jobs
 
 
+_tx_jobs = None
+
+
+def tx_jobs():
+    """The transcription job runner, created on first use."""
+    global _tx_jobs
+    if _tx_jobs is None:
+        from .transcribe.jobs import TranscribeJobs
+
+        _tx_jobs = TranscribeJobs(notify)
+    return _tx_jobs
+
+
 def _require_str(params: dict[str, Any], key: str) -> str:
     value = params.get(key)
     if not isinstance(value, str) or not value:
@@ -152,3 +165,22 @@ def omr_run(params: dict[str, Any]) -> dict[str, str]:
 @dispatcher.method("omr.cancel")
 def omr_cancel(params: dict[str, Any]) -> dict[str, bool]:
     return {"cancelled": jobs().cancel(_require_str(params, "jobId"))}
+
+
+@dispatcher.method("transcribe.run")
+def transcribe_run(params: dict[str, Any]) -> dict[str, str]:
+    """Start transcribing a piano recording; progress arrives as notifications."""
+    path = Path(_require_str(params, "audioPath"))
+    if not path.is_file():
+        raise RpcError(INVALID_PARAMS, f"file not found: {path}")
+    from .transcribe.model import ModelMissing
+
+    try:
+        return {"jobId": tx_jobs().start(path)}
+    except (ValueError, ModelMissing) as e:
+        raise RpcError(INVALID_PARAMS, str(e)) from e
+
+
+@dispatcher.method("transcribe.cancel")
+def transcribe_cancel(params: dict[str, Any]) -> dict[str, bool]:
+    return {"cancelled": tx_jobs().cancel(_require_str(params, "jobId"))}

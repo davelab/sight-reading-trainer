@@ -170,11 +170,24 @@ def track_beats(notes: list[NoteEvent], correction: float = CORRECTION) -> np.nd
             if best is None or score > best[0]:
                 best = (score, beats)
     beats = np.array(best[1] if best else [first])
-    # Beats before the agent's first one, back to the first attack.
-    step = beats[1] - beats[0] if len(beats) > 1 else 0.5
-    while beats[0] - first > step * 0.25:
-        beats = np.insert(beats, 0, beats[0] - step)
+    if len(beats) > 1 and beats[0] - first > 0.25 * (beats[1] - beats[0]):
+        beats = np.concatenate([_track_back(events, beats), beats])
     return beats
+
+
+def _track_back(events: list[_Event], beats: np.ndarray) -> np.ndarray:
+    """Beats before the winning agent's first one, back to the first attack: the
+    same agent run on the music reversed in time, so it follows the tempo there too."""
+    origin = float(beats[0])
+    mirrored = [
+        _Event(origin - e.time, e.salience) for e in reversed(events) if e.time <= origin + 1e-6
+    ]
+    period = float(np.median(np.diff(beats[: min(len(beats), 5)])))
+    span = origin - events[0].time
+    _, back = _run_agent(mirrored, 0, period, span + 0.5 * period)
+    times = origin - np.array(back[1:])
+    times = times[times > events[0].time - 0.5 * period]
+    return times[::-1]
 
 
 def to_beats(times: np.ndarray, beats: np.ndarray) -> np.ndarray:
