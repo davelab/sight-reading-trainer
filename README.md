@@ -189,6 +189,13 @@ sistema da solo sente metà tempo (16%); indicando un tempo anche approssimativo
 brano inizia in levare, indicalo. Limite noto: un ritardando che dimezza il
 tempo dentro una battuta; lì si corregge in revisione, oppure si parte dal MIDI.
 
+**Da MIDI a spartito**: «Apri…», «Trascrivi audio/MIDI…» o trascinamento di un
+`.mid`. Un MIDI esportato da un programma di notazione (note sulla griglia) usa
+la sua griglia, il suo tempo, metro e tonalità: il minuetto torna identico. Un
+MIDI suonato dal piano digitale passa per il riconoscimento del battito come
+l'audio (rubato compreso), con pedale da CC64; la batteria (canale 10) è
+ignorata. Non serve il modello. Codice: `transcribe/midifile.py` (mido, MIT).
+
 Il modello (154 MB) non è nel repository: `scripts/fetch-transcription-model.sh`
 lo scarica da Zenodo e lo converte una volta (vedi «Installazione», passo 2).
 

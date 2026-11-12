@@ -46,8 +46,9 @@ export function TranscribeSetup() {
       >
         <h2 id="tx-setup-title">Trascrivi «{fileName}»</h2>
         <p className="tx-help">
-          Se sai già qualcosa del brano, indicalo: la trascrizione sbaglia meno. Lascia «automatico» dove non sei
-          sicuro.
+          {/\.(mid|midi|kar)$/i.test(fileName ?? '')
+            ? 'Un MIDI esportato da un programma di notazione ha già tempo, metro e tonalità: lascia tutto su «automatico». Per un MIDI suonato dal piano digitale, quello che sai aiuta come per l\u2019audio.'
+            : 'Se sai già qualcosa del brano, indicalo: la trascrizione sbaglia meno. Lascia «automatico» dove non sei sicuro.'}
         </p>
         <label>
           <span>Tempo (♩ al minuto)</span>

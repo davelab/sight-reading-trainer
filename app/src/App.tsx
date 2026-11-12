@@ -16,7 +16,7 @@ import { useOmrEvents } from './hooks/useOmrEvents'
 import { usePlaybackPosition } from './hooks/usePlaybackPosition'
 import { useViewSync } from './hooks/useViewSync'
 import { inTauri, ipc } from './lib/ipc'
-import { AUDIO_EXTENSIONS, SCORE_EXTENSIONS, openScoreFile, openScorePath } from './lib/loadScore'
+import { AUDIO_EXTENSIONS, MIDI_EXTENSIONS, SCORE_EXTENSIONS, openScoreFile, openScorePath } from './lib/loadScore'
 import { useMidi } from './stores/midi'
 import { useOmr } from './stores/omr'
 import { useScore } from './stores/score'
@@ -70,7 +70,7 @@ export default function App() {
     const path = await open({
       multiple: false,
       filters: [
-        { name: 'Spartiti (MusicXML o PDF)', extensions: SCORE_EXTENSIONS },
+        { name: 'Spartiti (MusicXML, PDF o MIDI)', extensions: [...SCORE_EXTENSIONS, ...MIDI_EXTENSIONS] },
         { name: 'MusicXML', extensions: SCORE_EXTENSIONS.filter((e) => e !== 'pdf') },
         { name: 'PDF', extensions: ['pdf'] }
       ]
@@ -81,7 +81,10 @@ export default function App() {
   const transcribeDialog = async () => {
     const path = await open({
       multiple: false,
-      filters: [{ name: 'Registrazioni di pianoforte', extensions: AUDIO_EXTENSIONS }]
+      filters: [
+        { name: 'Registrazioni di pianoforte o MIDI', extensions: [...AUDIO_EXTENSIONS, ...MIDI_EXTENSIONS] },
+        { name: 'MIDI', extensions: MIDI_EXTENSIONS }
+      ]
     })
     if (typeof path === 'string') await openScorePath(path)
   }
@@ -93,9 +96,9 @@ export default function App() {
         {inTauri && (
           <button
             onClick={() => void transcribeDialog()}
-            title="Da una registrazione di pianoforte (MP3, WAV, M4A…) a partitura e MIDI"
+            title="Da una registrazione di pianoforte (MP3, WAV, M4A…) o da un file MIDI a partitura"
           >
-            Trascrivi audio…
+            Trascrivi audio/MIDI…
           </button>
         )}
         <input

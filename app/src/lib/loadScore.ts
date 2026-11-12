@@ -14,8 +14,15 @@ export const SCORE_EXTENSIONS = ['musicxml', 'xml', 'mxl', 'pdf']
 /** Piano recordings the transcription accepts (engine/score_engine/transcribe/jobs.py). */
 export const AUDIO_EXTENSIONS = ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg', 'aif', 'aiff', 'caf']
 
+/** MIDI files become scores the same way (engine transcribe/midifile.py). */
+export const MIDI_EXTENSIONS = ['mid', 'midi', 'kar']
+
 export function isAudioFile(name: string): boolean {
   return AUDIO_EXTENSIONS.includes(name.split('.').pop()?.toLowerCase() ?? '')
+}
+
+export function isMidiFile(name: string): boolean {
+  return MIDI_EXTENSIONS.includes(name.split('.').pop()?.toLowerCase() ?? '')
 }
 
 export function isScoreFile(name: string): boolean {
@@ -108,10 +115,10 @@ async function withLoading(task: () => Promise<void>): Promise<void> {
 /** Open a file by path through the Rust core (Tauri only; handles .mxl and PDF import). */
 export function openScorePath(path: string): Promise<void> {
   if (path.toLowerCase().endsWith('.pdf')) return startPdfImport(path)
-  if (isAudioFile(path)) return startAudioTranscription(path)
+  if (isAudioFile(path) || isMidiFile(path)) return startAudioTranscription(path)
   return withLoading(async () => {
     if (!isScoreFile(path)) {
-      throw new Error('Formato non supportato: usa .musicxml, .xml, .mxl, .pdf o una registrazione audio')
+      throw new Error('Formato non supportato: usa .musicxml, .xml, .mxl, .pdf, .mid o una registrazione audio')
     }
     const file = await ipc.loadScore(path)
     await openMusicXml(file.fileName, file.musicxml, null)

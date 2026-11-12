@@ -225,7 +225,7 @@ def test_job_cancel(tmp_path, monkeypatch):
 
 
 def test_rejects_non_audio(tmp_path):
-    with pytest.raises(ValueError, match="formato audio"):
+    with pytest.raises(ValueError, match="formato non supportato"):
         tx_jobs.TranscribeJobs(lambda *_: None).start(tmp_path / "score.pdf")
 
 

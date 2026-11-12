@@ -59,7 +59,7 @@ if [[ "$WHAT" == all || "$WHAT" == engine ]]; then
   build engine \
     --exclude-module homr --exclude-module onnxruntime --exclude-module cv2 \
     --exclude-module rapidocr --exclude-module pypdfium2 \
-    --exclude-module soundfile --exclude-module scipy --exclude-module anthropic
+    --exclude-module soundfile --exclude-module scipy --exclude-module anthropic --exclude-module mido
 fi
 if [[ "$WHAT" == all || "$WHAT" == omr ]]; then
   build omr \

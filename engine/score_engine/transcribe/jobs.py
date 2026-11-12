@@ -38,11 +38,15 @@ class TranscribeJobs:
         self._lock = threading.Lock()
 
     def start(self, audio: Path, hints: TranscribeHints | None = None) -> str:
-        if audio.suffix.lower() not in AUDIO_SUFFIXES:
-            raise ValueError(f"formato audio non supportato: {audio.suffix or audio.name}")
-        from .model import model_path
+        from .midifile import MIDI_SUFFIXES
 
-        model_path()  # fail fast (in the reply) when the model is not installed
+        suffix = audio.suffix.lower()
+        if suffix not in AUDIO_SUFFIXES | MIDI_SUFFIXES:
+            raise ValueError(f"formato non supportato: {audio.suffix or audio.name}")
+        if suffix not in MIDI_SUFFIXES:
+            from .model import model_path
+
+            model_path()  # fail fast (in the reply) when the model is not installed
         job_id = uuid.uuid4().hex[:12]
         cancel = threading.Event()
         with self._lock:
@@ -101,6 +105,10 @@ def transcribe(
         if cancel is not None and cancel.is_set():
             raise Cancelled
 
+    from .midifile import MIDI_SUFFIXES
+
+    if audio.suffix.lower() in MIDI_SUFFIXES:
+        return _from_midi(audio, job_id, progress, hints)
     progress(job_id, "load", 0.0)
     samples = load_audio(audio)
     check_cancel()
@@ -124,6 +132,39 @@ def transcribe(
         midi=base64.b64encode(to_midi(notes, pedals)).decode("ascii"),
         duration=len(samples) / SAMPLE_RATE,
         notes=len(notes),
+        facts=TranscribeFacts(**facts),
+        warnings=check(musicxml),
+    )
+
+
+def _from_midi(
+    path: Path,
+    job_id: str,
+    progress: Callable[[str, str, float], None],
+    hints: TranscribeHints | None,
+) -> TranscribeResult:
+    """A MIDI file to a score: its own grid and signatures when it has them, else
+    the beat tracking of an audio transcription. The user's hints win."""
+    from .midifile import read_midi
+    from .notation import to_score
+
+    progress(job_id, "load", 0.0)
+    midi = read_midi(path)
+    given = (hints or TranscribeHints()).model_dump(exclude_none=True)
+    merged = TranscribeHints(**{**midi.hints.model_dump(exclude_none=True), **given})
+    if not midi.on_grid and "tempo" not in given:
+        merged.tempo = None  # a played file's tempo marking says little about its beat
+    progress(job_id, "notation", 0.0)
+    musicxml, facts = to_score(
+        midi.notes, midi.pedals, title=path.stem, hints=merged, grid=midi.grid
+    )
+    progress(job_id, "notation", 1.0)
+    return TranscribeResult(
+        jobId=job_id,
+        musicxml=musicxml,
+        midi=base64.b64encode(path.read_bytes()).decode("ascii"),
+        duration=midi.duration,
+        notes=len(midi.notes),
         facts=TranscribeFacts(**facts),
         warnings=check(musicxml),
     )

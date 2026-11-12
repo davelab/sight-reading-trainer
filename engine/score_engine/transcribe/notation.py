@@ -196,9 +196,12 @@ def to_score(
     pedals: list[PedalEvent] | None = None,
     title: str = "",
     hints: TranscribeHints | None = None,
+    grid: np.ndarray | None = None,
 ) -> tuple[str, dict]:
     """MusicXML of the transcription, and facts about it (tempo, meter, key).
-    `hints`: what the user knows (tempo, meter, key, pickup); the rest is inferred."""
+    `hints`: what the user knows (tempo, meter, key, pickup); the rest is inferred.
+    `grid`: exact quarter-note beat times (s), the first on a bar line, when the
+    notes come from a MIDI file written on a grid: no beat tracking then."""
     from music21 import (
         chord,
         clef,
@@ -224,12 +227,17 @@ def to_score(
             return None
         return int(round(float(np.min(to_beats(onsets, beats))))) + hints.pickup_beats
 
-    beats = track_beats(notes, tempo=hints.tempo)
-    meter_beats, positions = choose_meter(beats, notes, hints.beats_per_measure, anchor(beats))
-    beats = regularize(beats, positions, meter_beats, beat_accents(beats, notes))
-    # Re-find the downbeats on the regular grid (no slips left), same meter.
-    if len(beats):
-        positions = choose_meter(beats, notes, meter_beats, anchor(beats))[1]
+    if grid is not None:
+        beats = np.asarray(grid, dtype=float)
+        meter_beats = hints.beats_per_measure or choose_meter(beats, notes)[0]
+        positions = [i % meter_beats for i in range(len(beats))]
+    else:
+        beats = track_beats(notes, tempo=hints.tempo)
+        meter_beats, positions = choose_meter(beats, notes, hints.beats_per_measure, anchor(beats))
+        beats = regularize(beats, positions, meter_beats, beat_accents(beats, notes))
+        # Re-find the downbeats on the regular grid (no slips left), same meter.
+        if len(beats):
+            positions = choose_meter(beats, notes, meter_beats, anchor(beats))[1]
     first = next((i for i, p in enumerate(positions) if p == 0), 0)
     on_beats = to_beats(np.array([n.onset for n in notes]), beats)
     first_downbeat = first if first <= float(np.min(on_beats)) + 0.5 else first - meter_beats
