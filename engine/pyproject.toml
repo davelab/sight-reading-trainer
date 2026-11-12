@@ -37,3 +37,18 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv]
+# onnxruntime stopped publishing Intel-Mac wheels after 1.23.2, while homr 0.7.1
+# asks for >= 1.24.1. On Intel Macs use 1.23.2: homr's tests (including the real
+# OMR exit test) pass with it. Everywhere else keep homr's own requirement.
+override-dependencies = [
+    "onnxruntime==1.23.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "onnxruntime>=1.24.1,<2; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+]
+# Fail the lock here, not on a user's Mac, if a platform loses its wheels.
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
