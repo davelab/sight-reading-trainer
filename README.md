@@ -113,7 +113,19 @@ tempo, altezza), mai per ID. Il controllo automatico segnala solo le battute
 la cui durata non torna con il tempo in chiave: le altezze sbagliate (come i
 diesis persi) vanno viste confrontando con il PDF.
 
-Prossima: M6 (packaging e beta). Vedi la roadmap in `docs/SPEC.md`.
+### Note cadenti (dopo l'MVP, su richiesta)
+
+| Fatto | Dove |
+|---|---|
+| Vista Partitura / Note cadenti / Entrambe (barra degli strumenti) | `App.tsx`, `components/FallingNotes` |
+| Note che cadono sui tasti, colorate per mano, più chiare e con alone mentre suonano; animazione fluida tra gli aggiornamenti di posizione di Rust | `FallingNotes.tsx`, `lib/fallingNotes.ts` |
+| Accordi dell'analisi a sinistra, linee di battuta e guide sui do, nomi delle note sulle barre e dei tasti sulla tastiera | idem, `components/Keyboard` |
+| Impostazioni (⚙︎): colori delle mani, mani visibili, volume, riverbero, zoom; ricordate tra le sessioni | `components/ViewSettings`, `stores/view.ts` |
+| Trasposizione −/+ in semitoni: suono, tastiera, note cadenti e modalità «Segui» | `playback.rs`, `follow.rs`, `Transport` |
+| Barra di avanzamento trascinabile | `Transport` |
+
+Il pedale arriverà con la trascrizione da audio (l'unica fonte che lo conosce).
+La M6 (firma, notarizzazione, beta) è sospesa: l'app è per uso personale.
 
 ## Requisiti
 

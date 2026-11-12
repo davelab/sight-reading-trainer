@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { AnalysisPanel } from './components/AnalysisPanel'
+import { FallingNotes } from './components/FallingNotes'
 import { Keyboard } from './components/Keyboard'
 import { MidiPanel } from './components/MidiPanel'
 import { OmrPages, OmrProgress, OmrReviewBar } from './components/OmrReview'
@@ -10,12 +11,14 @@ import { useFileDrop } from './hooks/useFileDrop'
 import { useMidiEvents } from './hooks/useMidiEvents'
 import { useOmrEvents } from './hooks/useOmrEvents'
 import { usePlaybackPosition } from './hooks/usePlaybackPosition'
+import { useViewSync } from './hooks/useViewSync'
 import { inTauri, ipc } from './lib/ipc'
 import { SCORE_EXTENSIONS, openScoreFile, openScorePath } from './lib/loadScore'
 import { useMidi } from './stores/midi'
 import { useOmr } from './stores/omr'
 import { useScore } from './stores/score'
 import { useTransport } from './stores/transport'
+import { useView } from './stores/view'
 
 const ZOOM_MIN = 20
 const ZOOM_MAX = 80
@@ -25,6 +28,9 @@ export default function App() {
   usePlaybackPosition()
   useMidiEvents()
   useOmrEvents()
+  useViewSync()
+  const mode = useView((s) => s.mode)
+  const setView = useView((s) => s.set)
   const reviewing = useOmr((s) => s.phase === 'review')
   const dropping = useFileDrop()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -85,6 +91,19 @@ export default function App() {
           }}
         />
         <MidiPanel />
+        <div className="toolbar-group segmented" role="group" aria-label="Vista">
+          {(
+            [
+              ['score', 'Partitura'],
+              ['falling', 'Note cadenti'],
+              ['both', 'Entrambe']
+            ] as const
+          ).map(([value, label]) => (
+            <button key={value} className={mode === value ? 'selected' : ''} onClick={() => setView({ mode: value })}>
+              {label}
+            </button>
+          ))}
+        </div>
         <h1 className="title">{loading ? 'Caricamento…' : (title ?? 'Score Studio')}</h1>
         <div className="toolbar-group">
           <button disabled={!hasScore || zoom <= ZOOM_MIN} onClick={() => set({ zoom: zoom - 5 })} title="Riduci">
@@ -106,9 +125,14 @@ export default function App() {
         </div>
       )}
       {reviewing ? <OmrReviewBar /> : <AnalysisPanel />}
-      <main className="main">
+      <main className={`main view-${reviewing ? 'score' : mode}`}>
         {reviewing && <OmrPages />}
-        <ScoreView />
+        {(reviewing || mode !== 'falling') && <ScoreView />}
+        {!reviewing && mode !== 'score' && (
+          <div className="falling-pane">
+            <FallingNotes />
+          </div>
+        )}
       </main>
       <OmrProgress />
       <Keyboard />

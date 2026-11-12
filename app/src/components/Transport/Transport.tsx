@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { inTauri, ipc, type Hands } from '../../lib/ipc'
+import { useView } from '../../stores/view'
+import { ViewSettings } from '../ViewSettings'
 import { useScore } from '../../stores/score'
 import { useTransport } from '../../stores/transport'
 import './Transport.css'
@@ -23,6 +26,10 @@ export function Transport() {
   const t = useTransport()
   const enabled = hasScore && inTauri
   const duration = t.info?.durationMs ?? 0
+  const transpose = useView((s) => s.transpose)
+  const setView = useView((s) => s.set)
+  const [settings, setSettings] = useState(false)
+  const [scrub, setScrub] = useState<number | null>(null)
 
   const togglePlay = () => void (t.playing ? ipc.pause() : ipc.play())
 
@@ -54,6 +61,23 @@ export function Transport() {
 
   return (
     <footer className="transport">
+      <input
+        className="seek"
+        type="range"
+        min={0}
+        max={Math.max(1, duration)}
+        step={10}
+        value={scrub ?? t.positionMs}
+        disabled={!enabled}
+        aria-label="Posizione"
+        onChange={(e) => {
+          const ms = Number(e.target.value)
+          setScrub(ms)
+          void ipc.seek(ms)
+        }}
+        onPointerUp={() => setScrub(null)}
+        onKeyUp={() => setScrub(null)}
+      />
       <div className="transport-group">
         <button disabled={!enabled} onClick={() => void ipc.seek(t.loop?.startMs ?? 0)} title="Torna all'inizio">
           ⏮
@@ -112,6 +136,31 @@ export function Transport() {
           </button>
         ))}
       </div>
+
+      <div className="transport-group" aria-label="Trasposizione">
+        <button
+          disabled={!hasScore || transpose <= -12}
+          onClick={() => setView({ transpose: transpose - 1 })}
+          title="Trasponi giù di un semitono"
+        >
+          −
+        </button>
+        <span className="transpose" title="Trasposizione in semitoni">
+          {transpose > 0 ? `+${transpose}` : transpose} st
+        </span>
+        <button
+          disabled={!hasScore || transpose >= 12}
+          onClick={() => setView({ transpose: transpose + 1 })}
+          title="Trasponi su di un semitono"
+        >
+          +
+        </button>
+      </div>
+
+      <button className="gear" onClick={() => setSettings(!settings)} title="Impostazioni" aria-expanded={settings}>
+        ⚙︎
+      </button>
+      {settings && <ViewSettings onClose={() => setSettings(false)} />}
 
       <span className="synth-status">
         {!inTauri

@@ -1,15 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
 import { inTauri, ipc } from '../../lib/ipc'
+import { KEYS, noteLabel } from '../../lib/keyboardLayout'
 import { keyLights } from '../../lib/keyboardState'
 import { useMidi } from '../../stores/midi'
 import { useScore } from '../../stores/score'
 import { useTransport } from '../../stores/transport'
+import { useView } from '../../stores/view'
 import './Keyboard.css'
-
-const LOW = 21 // A0
-const HIGH = 108 // C8
-const WHITE_PCS = new Set([0, 2, 4, 5, 7, 9, 11])
-const isWhite = (pitch: number) => WHITE_PCS.has(pitch % 12)
 
 const HEIGHT_KEY = 'keyboard-height'
 const MIN_HEIGHT = 60
@@ -40,16 +37,15 @@ export function Keyboard() {
   const pressed = useRef<number | null>(null)
   const [height, setHeight] = useState(savedHeight)
 
+  const { transpose, showKeyNames, showRight, showLeft } = useView()
   const eventsById = useMemo(() => new Map(events.map((e) => [e.noteId, e])), [events])
-  const lights = keyLights(currentNoteIds, eventsById, following ? expectedPitches : undefined)
+  const allLights = keyLights(currentNoteIds, eventsById, following ? expectedPitches : undefined, transpose)
+  const lights = new Map(
+    [...allLights].filter(([, l]) => (l.hand === 'right' ? showRight : showLeft))
+  )
   const held = new Set(heldPitches)
   const wrong = new Set(wrongPitches)
 
-  const whites: number[] = []
-  const blacks: number[] = []
-  for (let p = LOW; p <= HIGH; p++) (isWhite(p) ? whites : blacks).push(p)
-  const whiteIndex = (p: number) => whites.filter((w) => w < p).length
-  const W = 100 / whites.length
 
   const cls = (p: number) => {
     if (held.has(p)) return following ? (wrong.has(p) ? 'wrong' : 'correct') : 'played'
@@ -107,6 +103,9 @@ export function Keyboard() {
       >
         {/* Remounted on every new attack: replays the strike animation. */}
         {light && <span key={light.strikeId} className="strike" />}
+        {showKeyNames && color === 'white' && (
+          <span className={`key-name${p % 12 === 0 ? ' c' : ''}`}>{noteLabel(p, p % 12 === 0)}</span>
+        )}
       </div>
     )
   }
@@ -120,8 +119,8 @@ export function Keyboard() {
         title="Trascina per cambiare l'altezza (doppio clic: predefinita)"
       />
       <div className="keyboard" aria-label="Tastiera" onPointerUp={release} onPointerLeave={release}>
-        {whites.map((p, i) => key(p, 'white', i * W, W))}
-        {blacks.map((p) => key(p, 'black', whiteIndex(p) * W - W * 0.3, W * 0.6))}
+        {KEYS.filter((k) => k.white).map((k) => key(k.pitch, 'white', k.left * 100, k.width * 100))}
+        {KEYS.filter((k) => !k.white).map((k) => key(k.pitch, 'black', k.left * 100, k.width * 100))}
       </div>
     </div>
   )
