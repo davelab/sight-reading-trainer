@@ -23,6 +23,9 @@
   color: var(--danger);
 }
 .omr-review-bar {
+  flex: none;
+  max-height: 35vh; /* the score below must stay visible */
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -64,6 +67,17 @@
 .warning-chip {
   border-color: #f08c00;
   background: rgb(240 140 0 / 0.12);
+  padding: 1px 8px;
+}
+.omr-warnings {
+  max-height: 96px;
+  overflow: auto;
+}
+button.link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  padding: 0 4px;
 }
 .omr-pages {
   width: 42%;

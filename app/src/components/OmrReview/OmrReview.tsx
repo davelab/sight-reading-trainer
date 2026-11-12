@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { pitchName } from '../../lib/noteRefs'
 import { revealMeasure } from '../../lib/overlay'
 import {
@@ -12,6 +12,9 @@ import {
 } from '../../stores/omr'
 import { useScore } from '../../stores/score'
 import './OmrReview.css'
+
+/** Warnings shown before «+N altre». */
+const VISIBLE_WARNINGS = 12
 
 const STAGE: Record<string, string> = {
   render: 'Preparazione delle pagine',
@@ -53,6 +56,13 @@ export function OmrReviewBar() {
   const { fileName, warnings, selected, history, busy, error } = useOmr()
   const labels = useScore((s) => s.measureLabels)
   const measureIds = useScore((s) => s.measureIds)
+  const [showAll, setShowAll] = useState(false)
+
+  // One chip per measure: both hands' messages go in its tooltip.
+  const byMeasure = new Map<number, string[]>()
+  for (const w of warnings) byMeasure.set(w.measure, [...(byMeasure.get(w.measure) ?? []), w.message])
+  const measures = [...byMeasure.entries()].sort((a, b) => a[0] - b[0])
+  const shown = showAll ? measures : measures.slice(0, VISIBLE_WARNINGS)
 
   // Keyboard: ↑/↓ step, d diesis, b bemolle, n bequadro, ⌫ elimina, ⌘Z annulla, Esc deseleziona.
   useEffect(() => {
@@ -136,18 +146,28 @@ export function OmrReviewBar() {
         {error && <span className="omr-error">{error}</span>}
       </div>
       <div className="omr-row omr-warnings">
-        {warnings.length === 0 ? (
+        {measures.length === 0 ? (
           <span className="omr-ok">Nessuna battuta sospetta: controlla comunque note e alterazioni.</span>
         ) : (
           <>
-            <span>
-              {warnings.length} {warnings.length === 1 ? 'battuta sospetta' : 'battute sospette'}:
+            <span title="Battute la cui durata non torna con il tempo in chiave (arancioni in partitura)">
+              {measures.length} {measures.length === 1 ? 'battuta sospetta' : 'battute sospette'}:
             </span>
-            {warnings.map((w, i) => (
-              <button key={i} className="warning-chip" onClick={() => reveal(w.measure)}>
-                {w.message}
+            {shown.map(([measure, messages]) => (
+              <button
+                key={measure}
+                className="warning-chip"
+                title={messages.join('\n')}
+                onClick={() => reveal(measure)}
+              >
+                Batt. {labels[measure - 1] ?? measure}
               </button>
             ))}
+            {measures.length > VISIBLE_WARNINGS && (
+              <button className="link" onClick={() => setShowAll(!showAll)}>
+                {showAll ? 'Mostra meno' : `+${measures.length - VISIBLE_WARNINGS} altre`}
+              </button>
+            )}
           </>
         )}
       </div>
