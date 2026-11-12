@@ -1,5 +1,6 @@
 import { inTauri, ipc } from './ipc'
 import { buildNoteRefs } from './noteRefs'
+import { offerToSave } from './saveScore'
 import { metronomeClicks } from './practice'
 import { scoreDurationMs } from './timemap'
 import { loadScore } from './verovio'
@@ -76,6 +77,7 @@ export async function openMusicXml(
     return
   }
   transport.set({ playing: false, positionMs: 0, currentNoteIds: [], loop: null, pendingLoopStart: null })
+  score.set({ unsaved: false })
   // A new piece starts in its written key; the other view settings stay as chosen.
   if (useView.getState().transpose !== 0) useView.getState().set({ transpose: 0 })
   useMidi.getState().set({ following: false, expectedPitches: [], results: {}, timedResults: {}, timedSummary: null })
@@ -113,7 +115,8 @@ async function withLoading(task: () => Promise<void>): Promise<void> {
 }
 
 /** Open a file by path through the Rust core (Tauri only; handles .mxl and PDF import). */
-export function openScorePath(path: string): Promise<void> {
+export async function openScorePath(path: string): Promise<void> {
+  await offerToSave()
   if (path.toLowerCase().endsWith('.pdf')) return startPdfImport(path)
   if (isAudioFile(path) || isMidiFile(path)) return startAudioTranscription(path)
   return withLoading(async () => {

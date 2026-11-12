@@ -22,6 +22,8 @@ export interface ScoreState {
   /** Verovio note id -> musical position (for corrections). */
   noteRefs: Map<string, NoteRef>
   loading: boolean
+  /** The open score has changes not saved to a file (a corrected import). */
+  unsaved: boolean
   error: string | null
   /** Verovio scale in percent. */
   zoom: number
@@ -42,6 +44,7 @@ export const useScore = create<ScoreState>((set) => ({
   spellings: new Map(),
   noteRefs: new Map(),
   loading: false,
+  unsaved: false,
   error: null,
   zoom: 40,
   layout: 'scroll',

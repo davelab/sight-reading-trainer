@@ -161,3 +161,8 @@ button:disabled {
   border-color: var(--accent);
   color: white;
 }
+.toolbar button.unsaved {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}

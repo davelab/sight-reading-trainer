@@ -16,6 +16,9 @@ import { useOmrEvents } from './hooks/useOmrEvents'
 import { usePlaybackPosition } from './hooks/usePlaybackPosition'
 import { useViewSync } from './hooks/useViewSync'
 import { inTauri, ipc } from './lib/ipc'
+import { saveScore } from './lib/saveScore'
+import { ask } from '@tauri-apps/plugin-dialog'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { AUDIO_EXTENSIONS, MIDI_EXTENSIONS, SCORE_EXTENSIONS, openScoreFile, openScorePath } from './lib/loadScore'
 import { useMidi } from './stores/midi'
 import { useOmr } from './stores/omr'
@@ -39,6 +42,35 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null)
   const { title, loading, error, zoom, layout, set } = useScore()
   const hasScore = useScore((s) => s.events.length > 0)
+  const unsaved = useScore((s) => s.unsaved)
+
+  // ⌘S / Ctrl+S saves the open score as MusicXML.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void saveScore()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Closing the window with a corrected score not saved: ask first.
+  useEffect(() => {
+    if (!inTauri) return
+    const off = getCurrentWindow().onCloseRequested(async (event) => {
+      if (!useScore.getState().unsaved) return
+      const quit = await ask('Lo spartito corretto non è stato salvato. Chiudere comunque?', {
+        title: 'Modifiche non salvate',
+        kind: 'warning',
+        okLabel: 'Chiudi senza salvare',
+        cancelLabel: 'Annulla'
+      })
+      if (!quit) event.preventDefault()
+    })
+    return () => void off.then((fn) => fn())
+  }, [])
 
   // Open a score passed on the command line (once, even under StrictMode).
   useEffect(() => {
@@ -93,6 +125,16 @@ export default function App() {
     <div className="app">
       <header className="toolbar">
         <button onClick={() => void openDialog()}>Apri…</button>
+        <button
+          className={unsaved ? 'unsaved' : ''}
+          disabled={!hasScore}
+          onClick={() => void saveScore()}
+          title={
+            unsaved ? 'Modifiche non salvate: salva lo spartito in MusicXML (⌘S)' : 'Salva lo spartito in MusicXML (⌘S)'
+          }
+        >
+          {unsaved ? 'Salva… •' : 'Salva…'}
+        </button>
         {inTauri && (
           <button
             onClick={() => void transcribeDialog()}

@@ -325,7 +325,8 @@ export function finishReview(): void {
   const { musicxml } = useOmr.getState()
   useOmr.setState({ ...initial })
   if (musicxml) {
-    useScore.getState().set({ musicxml })
+    // The corrected score stays open but exists in no file yet: «Salva…» lights up.
+    useScore.getState().set({ musicxml, unsaved: true })
     void runAnalysis(musicxml)
   }
 }
