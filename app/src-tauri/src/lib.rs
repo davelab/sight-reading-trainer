@@ -79,14 +79,27 @@ pub fn run() {
             let soundfont = synth::find_soundfont(&dirs);
             let (engine, status) = synth::start(soundfont);
             spawn_position_emitter(app.handle().clone(), engine.clone());
-            let analysis = std::sync::Arc::new(engine::EngineClient::new(engine::Launcher::locate()));
+            let analysis = std::sync::Arc::new(engine::EngineClient::new("engine", engine::Launcher::locate("engine")));
             analysis.warm_up();
+            // The OMR sidecar starts on the first import; its models live in the app data dir.
+            let data_dir = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("score-studio"));
+            let omr_launcher = engine::Launcher::locate("omr")
+                .map(|l| l.with_env("SCORE_STUDIO_DATA_DIR", data_dir.to_string_lossy()));
+            let omr = std::sync::Arc::new(engine::EngineClient::new("omr", omr_launcher));
+            let handle = app.handle().clone();
+            omr.set_notification_handler(std::sync::Arc::new(move |method, params| {
+                // omr.progress -> omr:progress, omr.done -> omr:done, omr.failed -> omr:failed
+                if let Some(event) = method.strip_prefix("omr.") {
+                    let _ = handle.emit(&format!("omr:{event}"), params);
+                }
+            }));
             app.manage(AppState {
                 engine,
                 synth: status.kind,
                 soundfont: status.soundfont,
                 midi: Default::default(),
                 analysis,
+                omr,
             });
             Ok(())
         })
@@ -102,6 +115,10 @@ pub fn run() {
             commands::set_hands,
             commands::analyze,
             commands::import_pdf,
+            commands::omr_cancel,
+            commands::score_edit,
+            commands::score_check,
+            commands::save_text_file,
             commands::midi_list_devices,
             commands::midi_select,
             commands::set_follow_mode,

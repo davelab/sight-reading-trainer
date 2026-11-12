@@ -20,6 +20,7 @@ pub struct AppState {
     pub soundfont: Option<PathBuf>,
     pub midi: Mutex<Option<midi::Connection>>,
     pub analysis: Arc<EngineClient>,
+    pub omr: Arc<EngineClient>,
 }
 
 /// Generous: music21 on a long piece can take tens of seconds.
@@ -222,7 +223,64 @@ pub async fn analyze(state: State<'_, AppState>, musicxml: String) -> CmdResult<
     .map_err(|e| e.to_string())?
 }
 
+/// Start recognising a PDF in the `omr` sidecar. Returns `{jobId}` at once;
+/// progress and outcome arrive as `omr:progress`, `omr:done`, `omr:failed`.
 #[tauri::command]
-pub fn import_pdf() -> CmdResult<()> {
-    Err("import PDF (OMR): milestone M5".into())
+pub async fn import_pdf(
+    state: State<'_, AppState>,
+    path: String,
+    pages: Option<Vec<u32>>,
+) -> CmdResult<serde_json::Value> {
+    let client = state.omr.clone();
+    let mut params = serde_json::json!({ "pdfPath": path });
+    if let Some(pages) = pages {
+        params["pages"] = serde_json::json!(pages);
+    }
+    // The first call starts the sidecar (a large binary): allow for it.
+    tauri::async_runtime::spawn_blocking(move || client.request("omr.run", params, Duration::from_secs(120)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn omr_cancel(state: State<'_, AppState>, job_id: String) -> CmdResult<serde_json::Value> {
+    let client = state.omr.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        client.request("omr.cancel", serde_json::json!({ "jobId": job_id }), Duration::from_secs(10))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Correct one note of a recognised score (see engine `score.edit`).
+#[tauri::command]
+pub async fn score_edit(
+    state: State<'_, AppState>,
+    musicxml: String,
+    note: serde_json::Value,
+    action: String,
+) -> CmdResult<serde_json::Value> {
+    let client = state.analysis.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let params = serde_json::json!({ "musicxml": musicxml, "note": note, "action": action });
+        client.request("score.edit", params, Duration::from_secs(30))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn score_check(state: State<'_, AppState>, musicxml: String) -> CmdResult<serde_json::Value> {
+    let client = state.analysis.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        client.request("score.check", serde_json::json!({ "musicxml": musicxml }), Duration::from_secs(30))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Write a text file chosen by the user in a save dialog (MusicXML export).
+#[tauri::command]
+pub fn save_text_file(path: String, contents: String) -> CmdResult<()> {
+    std::fs::write(&path, contents).map_err(|e| format!("impossibile salvare {path}: {e}"))
 }
