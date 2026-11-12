@@ -97,3 +97,9 @@
   border-color: var(--accent);
   color: white;
 }
+.transport-group > button.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+}

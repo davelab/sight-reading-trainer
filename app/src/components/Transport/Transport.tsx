@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { inTauri, ipc, type Hands } from '../../lib/ipc'
 import { useView } from '../../stores/view'
 import { setMetronome } from '../../stores/practice'
+import { MetronomeIcon } from '../icons/MetronomeIcon'
 import { ViewSettings } from '../ViewSettings'
 import { useScore } from '../../stores/score'
 import { useTransport } from '../../stores/transport'
@@ -88,13 +89,14 @@ export function Transport() {
           {t.playing ? '⏸' : '▶'}
         </button>
         <button
-          className={metronome ? 'selected' : ''}
           disabled={!enabled}
           aria-pressed={metronome}
           onClick={() => void setMetronome(!metronome)}
+          aria-label="Metronomo"
           title="Metronomo: un clic per movimento (accento sul primo) mentre la musica va"
+          className={`icon-button${metronome ? ' selected' : ''}`}
         >
-          𝅘𝅥 Metronomo
+          <MetronomeIcon />
         </button>
         <span className="time">
           {formatTime(t.positionMs)} / {formatTime(duration)}
