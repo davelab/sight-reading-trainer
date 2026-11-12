@@ -75,6 +75,11 @@ export function measureLabelsFromMei(mei: string): string[] {
   return [...mei.matchAll(/<measure\b([^>]*)>/g)].map((m, i) => /\bn="([^"]+)"/.exec(m[1])?.[1] ?? String(i + 1))
 }
 
+/** xml:id of every measure in document order (index = measure ordinal - 1). */
+export function measureIdsFromMei(mei: string): string[] {
+  return [...mei.matchAll(/<measure\b([^>]*)>/g)].map((m) => /\bxml:id="([^"]+)"/.exec(m[1])?.[1] ?? '')
+}
+
 export interface MeasureStart {
   measureId: string
   /** 1-based index in performance order. */

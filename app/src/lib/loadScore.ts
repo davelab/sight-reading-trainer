@@ -20,7 +20,7 @@ function titleFromXml(xml: string): string | null {
 
 async function openMusicXml(fileName: string, musicxml: string, title: string | null): Promise<void> {
   const score = useScore.getState()
-  const { events, measures, onsets, measureLabels } = await loadScore(musicxml)
+  const { events, measures, onsets, measureLabels, measureIds } = await loadScore(musicxml)
   score.set({
     fileName,
     title: title ?? titleFromXml(musicxml) ?? fileName,
@@ -29,6 +29,7 @@ async function openMusicXml(fileName: string, musicxml: string, title: string | 
     measures,
     onsets,
     measureLabels,
+    measureIds,
     error: null
   })
   void runAnalysis(musicxml) // in the background: the score is usable meanwhile

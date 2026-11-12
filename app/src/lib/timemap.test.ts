@@ -7,6 +7,7 @@ import type { TimeMapEntry } from 'verovio'
 import {
   assignMeasures,
   buildPlaybackEvents,
+  measureIdsFromMei,
   measureLabelsFromMei,
   measureOnsets,
   measureStarts,
@@ -77,6 +78,7 @@ describe('measureLabelsFromMei', () => {
   it('reads printed numbers in document order', () => {
     const mei = '<section><measure xml:id="a" n="0"/><measure n="7" xml:id="b"><staff n="1"/></measure><measure xml:id="c"/></section>'
     expect(measureLabelsFromMei(mei)).toEqual(['0', '7', '3'])
+    expect(measureIdsFromMei(mei)).toEqual(['a', 'b', 'c'])
   })
 })
 

@@ -11,6 +11,8 @@ export interface ScoreState {
   onsets: Map<string, MeasureOnset[]>
   /** Printed measure number by ordinal - 1 (annotations use ordinals). */
   measureLabels: string[]
+  /** Measure xml:id by ordinal - 1. */
+  measureIds: string[]
   loading: boolean
   error: string | null
   /** Verovio scale in percent. */
@@ -27,6 +29,7 @@ export const useScore = create<ScoreState>((set) => ({
   measures: [],
   onsets: new Map(),
   measureLabels: [],
+  measureIds: [],
   loading: false,
   error: null,
   zoom: 40,

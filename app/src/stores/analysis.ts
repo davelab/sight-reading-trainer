@@ -7,6 +7,8 @@ export interface AnalysisDisplay {
   symbols: boolean
   /** Colour roman numerals by harmonic function. */
   functions: boolean
+  /** Tint repeated phrases, one colour per pattern. */
+  patterns: boolean
 }
 
 export interface AnalysisState {
@@ -14,6 +16,8 @@ export interface AnalysisState {
   status: 'idle' | 'running' | 'done' | 'error'
   error: string | null
   display: AnalysisDisplay
+  /** Pattern highlighted in the score (its id), if any. */
+  selectedPattern: string | null
   setDisplay: (patch: Partial<AnalysisDisplay>) => void
 }
 
@@ -21,7 +25,8 @@ export const useAnalysis = create<AnalysisState>((set) => ({
   analysis: null,
   status: 'idle',
   error: null,
-  display: { roman: true, symbols: false, functions: true },
+  display: { roman: true, symbols: false, functions: true, patterns: true },
+  selectedPattern: null,
   setDisplay: (patch) => set((s) => ({ display: { ...s.display, ...patch } }))
 }))
 
@@ -34,7 +39,7 @@ export async function runAnalysis(musicxml: string): Promise<void> {
     useAnalysis.setState({ analysis: null, status: 'error', error: "L'analisi richiede l'app desktop" })
     return
   }
-  useAnalysis.setState({ analysis: null, status: 'running', error: null })
+  useAnalysis.setState({ analysis: null, status: 'running', error: null, selectedPattern: null })
   try {
     const analysis = await ipc.analyze(musicxml)
     if (mine === request) useAnalysis.setState({ analysis, status: 'done' })

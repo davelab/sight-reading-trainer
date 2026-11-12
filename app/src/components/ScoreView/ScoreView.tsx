@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { inTauri, ipc } from '../../lib/ipc'
 import { drawAnalysis, systemSpacingFor } from '../../lib/analysisOverlay'
 import { followCursor, highlightNotes, markMeasures } from '../../lib/overlay'
+import { clearPatterns, drawPatterns } from '../../lib/patterns'
 import { renderPages, timeForNote } from '../../lib/verovio'
 import { useAnalysis } from '../../stores/analysis'
 import { useMidi } from '../../stores/midi'
@@ -24,6 +25,7 @@ export function ScoreView() {
   const onsets = useScore((s) => s.onsets)
   const analysis = useAnalysis((s) => s.analysis)
   const display = useAnalysis((s) => s.display)
+  const selectedPattern = useAnalysis((s) => s.selectedPattern)
   const events = useScore((s) => s.events)
   const leftHandIds = useRef(new Set<string>())
   useEffect(() => {
@@ -84,6 +86,14 @@ export function ScoreView() {
     drawAnalysis(el, analysis, onsets, display)
     return () => drawAnalysis(el, { chords: [] }, onsets, display)
   }, [analysis, display, onsets, pages])
+
+  // Repeated phrases: one colour per pattern.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    if (analysis?.patterns?.length && display.patterns) drawPatterns(el, analysis.patterns, selectedPattern)
+    else clearPatterns(el)
+  }, [analysis, display.patterns, selectedPattern, pages])
 
   // Follow-mode results: green measures without mistakes, red with.
   useEffect(() => {

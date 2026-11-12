@@ -86,3 +86,13 @@
 .score-view text.fn-dominant {
   fill: var(--fn-dominant);
 }
+/* Repeated phrases. */
+.score-view rect.pattern-mark {
+  stroke: none;
+  pointer-events: none;
+}
+.score-view text.pattern-label {
+  font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 800;
+  pointer-events: none;
+}

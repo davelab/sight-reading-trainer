@@ -7,6 +7,7 @@ import { VerovioToolkit } from 'verovio/esm'
 import {
   assignMeasures,
   buildPlaybackEvents,
+  measureIdsFromMei,
   measureLabelsFromMei,
   measureOnsets,
   measureStarts,
@@ -37,6 +38,8 @@ export interface LoadedScore {
   onsets: Map<string, MeasureOnset[]>
   /** Printed measure number by ordinal - 1. */
   measureLabels: string[]
+  /** Measure xml:id by ordinal - 1. */
+  measureIds: string[]
 }
 
 export async function loadScore(musicxml: string): Promise<LoadedScore> {
@@ -55,7 +58,9 @@ export async function loadScore(musicxml: string): Promise<LoadedScore> {
     return { pitch: midi.pitch, durMs: midi.duration, staff: staffs.get(id) ?? 1 }
   })
   const measures = measureStarts(timemap)
-  return { events: assignMeasures(events, measures), measures, onsets: measureOnsets(timemap), measureLabels: measureLabelsFromMei(mei) }
+  return { events: assignMeasures(events, measures), measures, onsets: measureOnsets(timemap), measureLabels: measureLabelsFromMei(mei),
+    measureIds: measureIdsFromMei(mei)
+  }
 }
 
 /** Lay the loaded score out at the given width and return one SVG string per page. */
