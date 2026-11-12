@@ -18,6 +18,7 @@ use serde::Serialize;
 
 use crate::follow::Follow;
 use crate::playback::{MidiAction, Transport};
+use crate::timed::{Timed, TimedSummary};
 
 /// Frames rendered between two scheduler ticks (≈ 1.5 ms at 44.1 kHz).
 pub const BLOCK_FRAMES: usize = 64;
@@ -175,6 +176,9 @@ pub const LIVE_CHANNEL: u8 = 10;
 pub struct Engine {
     pub transport: Transport,
     pub follow: Follow,
+    pub timed: Timed,
+    /// Hands the transport played before "A tempo" mode took them over.
+    hands_before_timed: Option<crate::playback::Hands>,
     synth: Option<Box<dyn Synth>>,
     actions: Vec<MidiAction>,
     left: Vec<f32>,
@@ -186,6 +190,8 @@ impl Engine {
         Self {
             transport: Transport::new(),
             follow: Follow::default(),
+            timed: Timed::default(),
+            hands_before_timed: None,
             synth,
             actions: Vec::with_capacity(128),
             left: vec![0.0; BLOCK_FRAMES],
@@ -213,10 +219,55 @@ impl Engine {
         }
     }
 
-    /// Transpose playback and follow mode by `semitones`.
+    /// Transpose playback, follow and "A tempo" modes by `semitones`.
     pub fn set_transpose(&mut self, semitones: i8) {
         self.with_transport(|t, out| t.set_transpose(semitones, out));
         self.follow.set_transpose(semitones);
+        self.timed.set_transpose(semitones);
+    }
+
+    /// "A tempo" mode: the player plays `hands` (the transport's hands setting),
+    /// the app plays the other hand, or nothing when both are practised; the
+    /// music starts after the count-in. Leaves follow mode.
+    pub fn start_timed(&mut self, tolerance_ms: f64, count_in: Option<(u32, f64)>) {
+        self.follow.stop();
+        let practised = self.transport.hands();
+        let rate = self.transport.rate();
+        self.with_transport(|t, out| {
+            t.pause(out);
+            if t.position_ms() >= t.duration_ms() {
+                t.seek(0.0, out);
+            }
+        });
+        let from = self.transport.position_ms();
+        self.timed.set_hands(practised);
+        self.timed.start(from, tolerance_ms, rate);
+        self.hands_before_timed = Some(practised);
+        self.with_transport(|t, out| {
+            use crate::playback::Hands;
+            match practised {
+                Hands::Both => t.set_silent(true, out),
+                Hands::Right => t.set_hands(Hands::Left, out),
+                Hands::Left => t.set_hands(Hands::Right, out),
+            }
+            match count_in {
+                Some((beats, beat_ms)) => t.play_with_count_in(beats, beat_ms),
+                None => t.play(),
+            }
+        });
+    }
+
+    /// Leave "A tempo" mode: the transport stops and plays every hand again.
+    pub fn stop_timed(&mut self) -> Option<TimedSummary> {
+        let summary = self.timed.stop();
+        if let Some(hands) = self.hands_before_timed.take() {
+            self.with_transport(|t, out| {
+                t.pause(out);
+                t.set_silent(false, out);
+                t.set_hands(hands, out);
+            });
+        }
+        summary
     }
 
     /// Sound a note played live (on-screen keyboard), outside the transport.
@@ -412,6 +463,34 @@ mod tests {
         let (mut l, mut r) = (vec![0.0; 4410], vec![0.0; 4410]);
         s.render(&mut l, &mut r);
         assert!(l.iter().any(|x| x.abs() > 0.01));
+    }
+
+    #[test]
+    fn timed_mode_plays_the_other_hand_and_restores_after() {
+        use crate::playback::Hands;
+        let ev = |id: &str, pitch, staff| PlaybackEvent {
+            note_id: id.to_string(),
+            pitch,
+            onset_ms: 0.0,
+            dur_ms: 500.0,
+            velocity: 80,
+            staff,
+            measure: 1,
+        };
+        let events = vec![ev("r", 72, 1), ev("l", 48, 2)];
+        let mut e = Engine::new(None);
+        e.timed.load(&events);
+        e.with_transport(|t, out| {
+            t.load(events, out);
+            t.set_hands(Hands::Right, out);
+        });
+        e.start_timed(100.0, Some((4, 500.0)));
+        assert!(e.timed.is_active() && e.transport.is_playing() && e.transport.counting_in());
+        assert_eq!(e.transport.hands(), Hands::Left, "the app accompanies with the left hand");
+        let summary = e.stop_timed().expect("was running");
+        assert_eq!(summary.expected, 0, "nothing judged before the music started");
+        assert_eq!(e.transport.hands(), Hands::Right);
+        assert!(!e.transport.is_playing());
     }
 
     #[test]

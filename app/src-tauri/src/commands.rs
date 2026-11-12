@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::engine::EngineClient;
 use crate::midi::{self, NoteMessage};
-use crate::playback::{Hands, Loop, PlaybackEvent, MAX_TEMPO, MIN_TEMPO};
+use crate::playback::{Click, Hands, Loop, PlaybackEvent, MAX_TEMPO, MIN_TEMPO};
 use crate::score::{read_score, LoadedFile};
 use crate::synth::{Engine, SharedEngine, SynthKind};
 
@@ -45,6 +45,8 @@ pub fn handle_live_note(app: &AppHandle, engine: &SharedEngine, note: NoteMessag
                 e.play_live(note.pitch, note.velocity, note.on);
             }
             if note.on {
+                let position = e.transport.position_ms();
+                e.timed.note_on(note.pitch, position);
                 e.follow_note(note.pitch)
             } else {
                 Vec::new()
@@ -81,7 +83,9 @@ pub struct PlaybackInfo {
 #[tauri::command]
 pub fn playback_load(state: State<'_, AppState>, events: Vec<PlaybackEvent>) -> CmdResult<PlaybackInfo> {
     let duration_ms = with_engine(&state, |e| {
+        e.stop_timed();
         e.follow.load(&events);
+        e.timed.load(&events);
         e.with_transport(|t, out| {
             t.load(events, out);
             t.duration_ms()
@@ -94,23 +98,35 @@ pub fn playback_load(state: State<'_, AppState>, events: Vec<PlaybackEvent>) -> 
     })
 }
 
-/// Start playback. Leaves follow mode, which is driven by the player instead of the clock.
+/// Leave "A tempo" mode if it is on, reporting its totals as `timed:summary`.
+fn end_timed(app: &AppHandle, e: &mut Engine) {
+    if let Some(summary) = e.stop_timed() {
+        let _ = app.emit("timed:summary", summary);
+    }
+}
+
+/// Start playback. Leaves follow and "A tempo" modes, driven by the player instead.
 #[tauri::command]
-pub fn play(state: State<'_, AppState>) -> CmdResult<()> {
+pub fn play(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
     with_engine(&state, |e| {
         e.follow.stop();
+        end_timed(&app, e);
         e.with_transport(|t, _| t.play())
     })
 }
 
 #[tauri::command]
-pub fn pause(state: State<'_, AppState>) -> CmdResult<()> {
-    with_engine(&state, |e| e.with_transport(|t, out| t.pause(out)))
+pub fn pause(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    with_engine(&state, |e| {
+        end_timed(&app, e);
+        e.with_transport(|t, out| t.pause(out))
+    })
 }
 
 #[tauri::command]
-pub fn seek(state: State<'_, AppState>, ms: f64) -> CmdResult<()> {
+pub fn seek(app: AppHandle, state: State<'_, AppState>, ms: f64) -> CmdResult<()> {
     with_engine(&state, |e| {
+        end_timed(&app, e);
         e.follow.seek(ms);
         let target = e.follow.current_onset().unwrap_or(ms);
         e.with_transport(|t, out| t.seek(target, out))
@@ -131,6 +147,7 @@ pub fn set_loop(state: State<'_, AppState>, r#loop: Option<Loop>) -> CmdResult<(
     with_engine(&state, |e| {
         e.with_transport(|t, _| t.set_loop(r#loop));
         e.follow.set_loop(r#loop);
+        e.timed.set_loop(r#loop);
         if let Some(ms) = e.follow.current_onset() {
             e.with_transport(|t, out| t.seek(ms, out));
         }
@@ -138,8 +155,9 @@ pub fn set_loop(state: State<'_, AppState>, r#loop: Option<Loop>) -> CmdResult<(
 }
 
 #[tauri::command]
-pub fn set_hands(state: State<'_, AppState>, hands: Hands) -> CmdResult<()> {
+pub fn set_hands(app: AppHandle, state: State<'_, AppState>, hands: Hands) -> CmdResult<()> {
     with_engine(&state, |e| {
+        end_timed(&app, e);
         e.with_transport(|t, out| t.set_hands(hands, out));
         e.follow.set_hands(hands);
         if let Some(ms) = e.follow.current_onset() {
@@ -169,8 +187,9 @@ pub fn set_transpose(state: State<'_, AppState>, semitones: i8) -> CmdResult<()>
 /// Turn follow (wait) mode on or off. On: playback stops and the cursor waits
 /// on the first chord at or after the current position.
 #[tauri::command]
-pub fn set_follow_mode(state: State<'_, AppState>, enabled: bool) -> CmdResult<bool> {
+pub fn set_follow_mode(app: AppHandle, state: State<'_, AppState>, enabled: bool) -> CmdResult<bool> {
     with_engine(&state, |e| {
+        end_timed(&app, e);
         if !enabled {
             e.follow.stop();
             return false;
@@ -184,6 +203,42 @@ pub fn set_follow_mode(state: State<'_, AppState>, enabled: bool) -> CmdResult<b
         }
         e.follow.is_active()
     })
+}
+
+/// Metronome beats of the loaded score (built by the frontend from the measures).
+#[tauri::command]
+pub fn set_clicks(state: State<'_, AppState>, clicks: Vec<Click>) -> CmdResult<()> {
+    with_engine(&state, |e| e.with_transport(|t, _| t.set_clicks(clicks)))
+}
+
+/// Metronome on or off, in any mode.
+#[tauri::command]
+pub fn set_metronome(state: State<'_, AppState>, enabled: bool) -> CmdResult<()> {
+    with_engine(&state, |e| e.with_transport(|t, out| t.set_metronome(enabled, out)))
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CountInArg {
+    beats: u32,
+    beat_ms: f64,
+}
+
+/// "A tempo" mode: the music runs at the set tempo from the current position
+/// (after `count_in`), and every note played is judged within `tolerance_ms`
+/// (real time). Results arrive as `timed:result` per measure and
+/// `timed:summary` at the end.
+#[tauri::command]
+pub fn start_timed_mode(state: State<'_, AppState>, tolerance_ms: f64, count_in: Option<CountInArg>) -> CmdResult<()> {
+    if !tolerance_ms.is_finite() || !(20.0..=500.0).contains(&tolerance_ms) {
+        return Err(format!("tolleranza fuori intervallo: {tolerance_ms} ms"));
+    }
+    with_engine(&state, |e| e.start_timed(tolerance_ms, count_in.map(|c| (c.beats.min(8), c.beat_ms))))
+}
+
+#[tauri::command]
+pub fn stop_timed_mode(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    with_engine(&state, |e| end_timed(&app, e))
 }
 
 #[derive(Serialize)]
@@ -325,7 +380,9 @@ pub fn api_key_status() -> CmdResult<bool> {
 pub fn set_api_key(key: Option<String>) -> CmdResult<()> {
     let entry = keychain()?;
     match key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
-        Some(k) if !k.starts_with("sk-ant-") => Err("non sembra una chiave API di Anthropic (inizia con sk-ant-)".into()),
+        Some(k) if !k.starts_with("sk-ant-") => {
+            Err("non sembra una chiave API di Anthropic (inizia con sk-ant-)".into())
+        }
         Some(k) => entry.set_password(&k).map_err(|e| format!("impossibile salvare la chiave: {e}")),
         None => match entry.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),

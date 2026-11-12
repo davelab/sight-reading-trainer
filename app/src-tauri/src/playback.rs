@@ -55,6 +55,29 @@ pub struct Loop {
     pub end_ms: f64,
 }
 
+/// A metronome beat, in score milliseconds; `accent` on the first beat of a measure.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Click {
+    pub ms: f64,
+    pub accent: bool,
+}
+
+/// General MIDI percussion: channel 10 (index 9), high and low wood block.
+pub const CLICK_CHANNEL: u8 = 9;
+const CLICK_ACCENT_KEY: u8 = 76;
+const CLICK_KEY: u8 = 77;
+const CLICK_VELOCITY: u8 = 110;
+
+/// Beats played before the music starts (count-in), in score milliseconds.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct CountIn {
+    beats: u32,
+    beat_ms: f64,
+    elapsed: f64,
+    emitted: u32,
+}
+
 /// Shortest loop accepted, in score milliseconds.
 pub const MIN_LOOP_MS: f64 = 50.0;
 pub const MIN_TEMPO: f64 = 0.25;
@@ -98,6 +121,14 @@ pub struct Transport {
     /// Index of the next event whose onset has not been dispatched yet.
     next: usize,
     sounding: Vec<Sounding>,
+    /// The score's notes are not sounded (the player plays them: "A tempo" mode).
+    silent: bool,
+    clicks: Vec<Click>,
+    metronome: bool,
+    next_click: usize,
+    /// Key of the click still sounding (released at the next one).
+    click_sounding: Option<u8>,
+    count_in: Option<CountIn>,
 }
 
 impl Default for Transport {
@@ -120,7 +151,58 @@ impl Transport {
             transpose: 0,
             next: 0,
             sounding: Vec::with_capacity(64),
+            silent: false,
+            clicks: Vec::new(),
+            metronome: false,
+            next_click: 0,
+            click_sounding: None,
+            count_in: None,
         }
+    }
+
+    /// Metronome beats for the loaded score (performance order, score ms).
+    pub fn set_clicks(&mut self, mut clicks: Vec<Click>) {
+        clicks.retain(|c| c.ms.is_finite() && c.ms >= 0.0);
+        clicks.sort_by(|a, b| a.ms.total_cmp(&b.ms));
+        self.clicks = clicks;
+        self.next_click = self.first_click_at(self.position_ms);
+    }
+
+    pub fn set_metronome(&mut self, on: bool, out: &mut Vec<MidiAction>) {
+        self.metronome = on;
+        if !on {
+            self.release_click(out);
+        }
+        self.next_click = self.first_click_at(self.position_ms);
+    }
+
+    pub fn hands(&self) -> Hands {
+        self.hands
+    }
+
+    pub fn rate(&self) -> f64 {
+        self.rate
+    }
+
+    /// Do not sound the score's notes (the cursor, clicks and timing go on).
+    pub fn set_silent(&mut self, silent: bool, out: &mut Vec<MidiAction>) {
+        if silent != self.silent {
+            self.release_all(out);
+            self.silent = silent;
+        }
+    }
+
+    /// Start playing after `beats` metronome clicks of `beat_ms` (score ms) each.
+    pub fn play_with_count_in(&mut self, beats: u32, beat_ms: f64) {
+        self.play();
+        if self.playing && beats > 0 && beat_ms.is_finite() && beat_ms > 0.0 {
+            self.count_in = Some(CountIn { beats, beat_ms, elapsed: 0.0, emitted: 0 });
+        }
+    }
+
+    /// The count-in is still running.
+    pub fn counting_in(&self) -> bool {
+        self.count_in.is_some()
     }
 
     /// Replace the score. Stops playback and rewinds.
@@ -163,13 +245,16 @@ impl Transport {
 
     pub fn pause(&mut self, out: &mut Vec<MidiAction>) {
         self.playing = false;
+        self.count_in = None;
         self.release_all(out);
+        self.release_click(out);
     }
 
     pub fn seek(&mut self, ms: f64, out: &mut Vec<MidiAction>) {
         self.release_all(out);
         self.position_ms = ms.clamp(0.0, self.duration_ms);
         self.next = self.first_event_at(self.position_ms);
+        self.next_click = self.first_click_at(self.position_ms);
     }
 
     /// Tempo factor: 1.0 = as written, 0.5 = half speed.
@@ -211,6 +296,21 @@ impl Transport {
             return false;
         }
         let mut remaining = real_ms * self.rate;
+        if let Some(mut c) = self.count_in {
+            let total = f64::from(c.beats) * c.beat_ms;
+            let step = remaining.min(total - c.elapsed);
+            c.elapsed += step;
+            remaining -= step;
+            while c.emitted < c.beats && f64::from(c.emitted) * c.beat_ms <= c.elapsed + 1e-9 {
+                self.click(c.emitted == 0, out);
+                c.emitted += 1;
+            }
+            if c.elapsed + 1e-9 < total {
+                self.count_in = Some(c);
+                return false;
+            }
+            self.count_in = None;
+        }
         loop {
             let looping = self.loop_range.filter(|l| self.position_ms < l.end_ms);
             let boundary = looping.map_or(self.duration_ms, |l| l.end_ms);
@@ -227,11 +327,13 @@ impl Transport {
                 Some(l) => {
                     self.position_ms = l.start_ms;
                     self.next = self.first_event_at(l.start_ms);
+                    self.next_click = self.first_click_at(l.start_ms);
                 }
                 None => {
                     self.position_ms = self.duration_ms;
                     self.next = self.events.len();
                     self.playing = false;
+                    self.release_click(out);
                     return true;
                 }
             }
@@ -257,6 +359,23 @@ impl Transport {
         self.events.partition_point(|e| e.onset_ms < ms)
     }
 
+    fn first_click_at(&self, ms: f64) -> usize {
+        self.clicks.partition_point(|c| c.ms < ms)
+    }
+
+    fn click(&mut self, accent: bool, out: &mut Vec<MidiAction>) {
+        self.release_click(out);
+        let key = if accent { CLICK_ACCENT_KEY } else { CLICK_KEY };
+        out.push(MidiAction::NoteOn { channel: CLICK_CHANNEL, key, velocity: CLICK_VELOCITY });
+        self.click_sounding = Some(key);
+    }
+
+    fn release_click(&mut self, out: &mut Vec<MidiAction>) {
+        if let Some(key) = self.click_sounding.take() {
+            out.push(MidiAction::NoteOff { channel: CLICK_CHANNEL, key });
+        }
+    }
+
     fn dispatch_until(&mut self, until_ms: f64, out: &mut Vec<MidiAction>) {
         // Note-offs first, so a repeated pitch is released before it restarts.
         self.sounding.retain(|s| {
@@ -266,12 +385,21 @@ impl Transport {
             }
             !done
         });
+        while let Some(c) = self.clicks.get(self.next_click).copied() {
+            if c.ms >= until_ms {
+                break;
+            }
+            self.next_click += 1;
+            if self.metronome {
+                self.click(c.accent, out);
+            }
+        }
         while let Some(e) = self.events.get(self.next) {
             if e.onset_ms >= until_ms {
                 break;
             }
             self.next += 1;
-            if !self.hands.plays(e.staff) {
+            if self.silent || !self.hands.plays(e.staff) {
                 continue;
             }
             let Some(key) = transposed(e.pitch, self.transpose) else { continue };
@@ -436,6 +564,64 @@ mod tests {
         assert!(out.contains(&on(69, 0)));
         assert_eq!(transposed(127, 1), None);
         assert_eq!(transposed(0, -1), None);
+    }
+
+    fn clicks_in(out: &[MidiAction]) -> Vec<u8> {
+        out.iter()
+            .filter_map(|a| match a {
+                NoteOn { channel: CLICK_CHANNEL, key, .. } => Some(*key),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn metronome_clicks_on_the_beats_only_when_on() {
+        let mut t = transport();
+        let mut out = Vec::new();
+        t.set_clicks(vec![Click { ms: 0.0, accent: true }, Click { ms: 500.0, accent: false }]);
+        t.play();
+        t.advance(1000.0, &mut out);
+        assert!(clicks_in(&out).is_empty(), "metronome off");
+        out.clear();
+        t.seek(0.0, &mut out);
+        t.set_metronome(true, &mut out);
+        t.play();
+        t.advance(600.0, &mut out);
+        assert_eq!(clicks_in(&out), vec![CLICK_ACCENT_KEY, CLICK_KEY]);
+        // The first click is released before the second sounds.
+        assert!(out.contains(&NoteOff { channel: CLICK_CHANNEL, key: CLICK_ACCENT_KEY }));
+    }
+
+    #[test]
+    fn count_in_clicks_before_the_music_starts() {
+        let mut t = transport();
+        let mut out = Vec::new();
+        t.play_with_count_in(2, 500.0);
+        t.advance(10.0, &mut out);
+        assert_eq!(clicks_in(&out), vec![CLICK_ACCENT_KEY]);
+        assert!(!out.iter().any(|a| matches!(a, NoteOn { channel: 0..=8, .. })), "no music yet");
+        assert_eq!(t.position_ms(), 0.0);
+        out.clear();
+        t.advance(500.0, &mut out); // second count-in beat at 500 ms
+        assert_eq!(clicks_in(&out), vec![CLICK_KEY]);
+        assert!(t.counting_in());
+        out.clear();
+        t.advance(500.0, &mut out); // count-in over, music from the top
+        assert!(!t.counting_in());
+        assert!(out.contains(&on(74, 0)));
+        assert!(t.position_ms() > 0.0 && t.position_ms() < 20.0);
+    }
+
+    #[test]
+    fn silent_transport_moves_without_sounding_notes() {
+        let mut t = transport();
+        let mut out = Vec::new();
+        t.set_silent(true, &mut out);
+        t.play();
+        t.advance(600.0, &mut out);
+        assert!(out.is_empty());
+        assert_eq!(t.position_ms(), 600.0);
     }
 
     #[test]

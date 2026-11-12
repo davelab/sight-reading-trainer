@@ -5,6 +5,7 @@ mod midi;
 mod playback;
 mod score;
 mod synth;
+mod timed;
 
 use std::thread;
 use std::time::Duration;
@@ -28,6 +29,10 @@ struct PositionEvent {
     following: bool,
     /// Pitches of the current chord not played yet (follow mode only).
     expected_pitches: Vec<u8>,
+    /// "A tempo" mode is on.
+    timed: bool,
+    /// The metronome is counting in before the music starts.
+    counting_in: bool,
 }
 
 /// Emit `playback:position` ~60 times a second while it changes (playing, or
@@ -39,6 +44,8 @@ fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
             let mut last: Option<PositionEvent> = None;
             loop {
                 thread::sleep(POSITION_INTERVAL);
+                let mut results = Vec::new();
+                let mut summary = None;
                 let event = match engine.lock() {
                     Ok(e) if e.follow.is_active() => PositionEvent {
                         note_ids: e.follow.expected_note_ids(),
@@ -46,16 +53,37 @@ fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
                         playing: false,
                         following: true,
                         expected_pitches: e.follow.expected_pitches(),
+                        timed: false,
+                        counting_in: false,
                     },
-                    Ok(e) => PositionEvent {
-                        note_ids: e.transport.current_note_ids(),
-                        ms: e.transport.position_ms(),
-                        playing: e.transport.is_playing(),
-                        following: false,
-                        expected_pitches: Vec::new(),
-                    },
+                    Ok(mut e) => {
+                        if e.timed.is_active() {
+                            let pos = e.transport.position_ms();
+                            results = e.timed.tick(pos);
+                            if !e.transport.is_playing() {
+                                // The music reached the end: the run is over.
+                                results.extend(e.timed.tick(f64::INFINITY));
+                                summary = e.stop_timed();
+                            }
+                        }
+                        PositionEvent {
+                            note_ids: e.transport.current_note_ids(),
+                            ms: e.transport.position_ms(),
+                            playing: e.transport.is_playing(),
+                            following: false,
+                            expected_pitches: Vec::new(),
+                            timed: e.timed.is_active(),
+                            counting_in: e.transport.counting_in(),
+                        }
+                    }
                     Err(_) => return,
                 };
+                for r in results {
+                    let _ = app.emit("timed:result", r);
+                }
+                if let Some(s) = summary {
+                    let _ = app.emit("timed:summary", s);
+                }
                 if last.as_ref() != Some(&event) {
                     let _ = app.emit("playback:position", &event);
                     last = Some(event);
@@ -141,6 +169,10 @@ pub fn run() {
             commands::midi_list_devices,
             commands::midi_select,
             commands::set_follow_mode,
+            commands::set_clicks,
+            commands::set_metronome,
+            commands::start_timed_mode,
+            commands::stop_timed_mode,
             commands::virtual_note,
         ])
         .run(tauri::generate_context!())
