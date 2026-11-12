@@ -30,7 +30,13 @@ describe('chordTimes', () => {
     { measureId: 'm2', index: 2, ms: 2000 }
   ]
   const onsets = new Map([
-    ['m1', [{ q: 0, noteIds: ['a'] }, { q: 2, noteIds: ['b'] }]],
+    [
+      'm1',
+      [
+        { q: 0, noteIds: ['a'] },
+        { q: 2, noteIds: ['b'] }
+      ]
+    ],
     ['m2', [{ q: 0, noteIds: ['c'] }]]
   ])
   const events = [ev('a', 0, 500), ev('b', 1000, 500), ev('c', 2000, 500)]
@@ -42,9 +48,14 @@ describe('chordTimes', () => {
       { measure: 2, beat: 1, offset: 0, symbol: 'F', roman: 'IV', function: 'predominant' as const }
     ]
     expect(chordTimes(chords, ['m1', 'm2'], measures, onsets, events)).toEqual([
-      { ms: 0, label: 'C' },
-      { ms: 500, label: 'G' },
-      { ms: 2000, label: 'F' }
+      { ms: 0, label: 'C', fn: 'tonic' },
+      { ms: 500, label: 'G', fn: 'dominant' },
+      { ms: 2000, label: 'F', fn: 'predominant' }
+    ])
+    expect(chordTimes(chords, ['m1', 'm2'], measures, onsets, events, (c) => c.roman).map((c) => c.label)).toEqual([
+      'I',
+      'V',
+      'IV'
     ])
   })
 })

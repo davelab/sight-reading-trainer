@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { chordLabel } from '../../lib/chordLabels'
 import { chordTimes, lighten, visibleEvents, type TimedLabel } from '../../lib/fallingNotes'
 import { KEYS, keyAt, noteLabel } from '../../lib/keyboardLayout'
 import { useAnalysis } from '../../stores/analysis'
@@ -39,8 +40,15 @@ export function FallingNotes() {
   useEffect(() => {
     const update = () => {
       const score = useScore.getState()
-      const chords = useAnalysis.getState().analysis?.chords ?? []
-      chordsRef.current = chordTimes(chords, score.measureIds, score.measures, score.onsets, score.events)
+      const { analysis, display } = useAnalysis.getState()
+      chordsRef.current = chordTimes(
+        analysis?.chords ?? [],
+        score.measureIds,
+        score.measures,
+        score.onsets,
+        score.events,
+        (c) => chordLabel(c, display.labelStyle)
+      )
       measureLines.current = [...new Set(score.measures.map((m) => m.ms))]
     }
     update()
@@ -81,7 +89,13 @@ export function FallingNotes() {
       const colors = {
         bg: cssVar('--falling-bg', '#f4f1ea'),
         line: cssVar('--falling-line', 'rgba(0,0,0,0.08)'),
-        text: cssVar('--text-secondary', '#666')
+        text: cssVar('--text-secondary', '#666'),
+        fn: {
+          tonic: cssVar('--fn-tonic', '#1f5fbf'),
+          predominant: cssVar('--fn-predominant', '#2a8a3e'),
+          dominant: cssVar('--fn-dominant', '#c2410c'),
+          other: ''
+        } as Record<string, string>
       }
       ctx.fillStyle = colors.bg
       ctx.fillRect(0, 0, w, h)
@@ -110,11 +124,12 @@ export function FallingNotes() {
 
       // Chord symbols on the left, at the time they start.
       if (view.showChords) {
-        ctx.fillStyle = colors.text
         ctx.font = '600 15px -apple-system, system-ui, sans-serif'
         ctx.textBaseline = 'bottom'
+        const coloured = useAnalysis.getState().display.functions
         for (const c of chordsRef.current) {
           if (c.ms < pos - 50 || c.ms > pos + windowMs) continue
+          ctx.fillStyle = (coloured && colors.fn[c.fn]) || colors.text
           ctx.fillText(c.label, 10, y(c.ms) - 2)
         }
       }

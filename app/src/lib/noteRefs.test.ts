@@ -14,7 +14,13 @@ const ev = (noteId: string, pitch: number, staff: number): PlaybackEvent => ({
 
 describe('note refs', () => {
   const onsets = new Map([
-    ['m1', [{ q: 0, noteIds: ['a', 'b'] }, { q: 1.5, noteIds: ['c'] }]],
+    [
+      'm1',
+      [
+        { q: 0, noteIds: ['a', 'b'] },
+        { q: 1.5, noteIds: ['c'] }
+      ]
+    ],
     ['m2', [{ q: 0, noteIds: ['d'] }]]
   ])
   const refs = buildNoteRefs(onsets, ['m1', 'm2'], [ev('a', 74, 1), ev('b', 55, 2), ev('c', 69, 1), ev('d', 71, 1)])

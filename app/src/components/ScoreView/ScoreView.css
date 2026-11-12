@@ -68,10 +68,12 @@
   fill: #333;
   pointer-events: none;
 }
-.score-view text.analysis-mark.symbol {
+.score-view text.analysis-mark.chord-label {
   font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
   font-weight: 600;
-  fill: #555;
+}
+.score-view text.analysis-mark.fn-letter {
+  font-weight: 800;
 }
 .score-view text.analysis-mark .key {
   font-weight: 700;
@@ -85,6 +87,9 @@
 }
 .score-view text.fn-dominant {
   fill: var(--fn-dominant);
+}
+.score-view text.fn-other {
+  fill: #8a8a8a;
 }
 /* Repeated phrases. */
 .score-view rect.pattern-mark {

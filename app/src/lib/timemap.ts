@@ -43,7 +43,15 @@ export function buildPlaybackEvents(
       const info = lookup(noteId)
       // Tied continuations and grace notes without MIDI duration are not re-triggered.
       if (!info || info.durMs <= 0 || info.pitch < 0 || info.pitch > 127) continue
-      events.push({ noteId, pitch: info.pitch, onsetMs: entry.tstamp, durMs: info.durMs, velocity, staff: info.staff, measure: 0 })
+      events.push({
+        noteId,
+        pitch: info.pitch,
+        onsetMs: entry.tstamp,
+        durMs: info.durMs,
+        velocity,
+        staff: info.staff,
+        measure: 0
+      })
     }
   }
   events.sort((a, b) => a.onsetMs - b.onsetMs || a.pitch - b.pitch)

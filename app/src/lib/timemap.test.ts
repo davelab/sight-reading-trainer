@@ -51,8 +51,18 @@ describe('assignMeasures', () => {
       { measureId: 'm1', index: 1, ms: 0 },
       { measureId: 'm2', index: 2, ms: 1500 }
     ]
-    const ev = (onsetMs: number) => ({ noteId: String(onsetMs), pitch: 60, onsetMs, durMs: 1, velocity: 80, staff: 1, measure: 0 })
-    expect(assignMeasures([ev(0), ev(1498), ev(1499.5), ev(3000)], measures).map((e) => e.measure)).toEqual([1, 1, 2, 2])
+    const ev = (onsetMs: number) => ({
+      noteId: String(onsetMs),
+      pitch: 60,
+      onsetMs,
+      durMs: 1,
+      velocity: 80,
+      staff: 1,
+      measure: 0
+    })
+    expect(assignMeasures([ev(0), ev(1498), ev(1499.5), ev(3000)], measures).map((e) => e.measure)).toEqual([
+      1, 1, 2, 2
+    ])
   })
 })
 
@@ -76,7 +86,8 @@ describe('measureOnsets', () => {
 
 describe('measureLabelsFromMei', () => {
   it('reads printed numbers in document order', () => {
-    const mei = '<section><measure xml:id="a" n="0"/><measure n="7" xml:id="b"><staff n="1"/></measure><measure xml:id="c"/></section>'
+    const mei =
+      '<section><measure xml:id="a" n="0"/><measure n="7" xml:id="b"><staff n="1"/></measure><measure xml:id="c"/></section>'
     expect(measureLabelsFromMei(mei)).toEqual(['0', '7', '3'])
     expect(measureIdsFromMei(mei)).toEqual(['a', 'b', 'c'])
   })
@@ -86,7 +97,11 @@ describe('staffMapFromMei', () => {
   it('assigns notes to the enclosing staff, chords included', () => {
     const mei = `<measure><staff xml:id="s1" n="1"><layer><note xml:id="n1"/><chord><note xml:id="n2"></note></chord></layer></staff>
       <staff n="2"><layer><note xml:id="n3" pname="g"/></layer></staff></measure>`
-    expect([...staffMapFromMei(mei)]).toEqual([['n1', 1], ['n2', 1], ['n3', 2]])
+    expect([...staffMapFromMei(mei)]).toEqual([
+      ['n1', 1],
+      ['n2', 1],
+      ['n3', 2]
+    ])
   })
 })
 

@@ -1,12 +1,14 @@
 /**
- * Harmonic analysis drawn into Verovio's SVG: chord symbols above the system,
- * roman numerals below it (coloured by function), the key at each region start.
+ * Harmonic analysis drawn into Verovio's SVG: one row of chord labels below each
+ * system, in the style the user picked (lib/chordLabels.ts), optionally coloured
+ * by function, with the key where each key region starts.
  *
  * Anchoring is by position, never by note ID: the n-th `g.measure` in document
  * order is measure ordinal n, and the x position comes from the notes that
  * start at `offset` quarters into that measure (interpolated between onsets).
  */
 import type { Analysis, Chord, KeyRegion } from '../types'
+import { type ChordLabelStyle, FUNCTION_NAMES, chordLabel, showsKey } from './chordLabels'
 import type { MeasureOnset } from './timemap'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -14,8 +16,10 @@ const MARK = 'analysis-mark'
 const DEFAULT_STAFF_SPACE = 180 // Verovio internal units at the default size
 
 export interface AnalysisDisplayOptions {
-  roman: boolean
-  symbols: boolean
+  /** Show the chord row at all. */
+  chords: boolean
+  labelStyle: ChordLabelStyle
+  /** Colour labels by harmonic function. */
   functions: boolean
 }
 
@@ -25,14 +29,21 @@ export interface RomanParts {
   lower: string
   /** Secondary target, e.g. "/V". */
   applied: string
+  /** Altered figures written apart, e.g. "♯6" for "ii#642". */
+  altered: string
 }
 
-/** Split "V65/V" into numeral "V", figures 6 over 5, and "/V". */
+/** Split "V65/V" into numeral "V", figures 6 over 5, and "/V"; "ii#642" into ii, 4 over 2, and ♯6. */
 export function splitRoman(figure: string): RomanParts {
-  const m = /^([b#]*(?:[ivIV]+)[o+ø]?)(\d{0,2})(\/.+)?$/.exec(figure)
-  if (!m) return { numeral: figure, upper: '', lower: '', applied: '' }
+  const m = /^([b#]*(?:[ivIV]+)[o+ø]?)((?:[#b]?\d){0,3})(\/.+)?$/.exec(figure)
+  const whole = { numeral: figure, upper: '', lower: '', applied: '', altered: '' }
+  if (!m) return whole
   const [, numeral, digits, applied = ''] = m
-  return { numeral, upper: digits.slice(0, 1), lower: digits.slice(1, 2), applied }
+  const tokens = digits.match(/[#b]?\d/g) ?? []
+  const plain = tokens.filter((t) => t.length === 1)
+  const altered = tokens.filter((t) => t.length === 2).map((t) => t.replace('#', '♯').replace('b', '♭'))
+  if (plain.length > 2) return whole
+  return { numeral, upper: plain[0] ?? '', lower: plain[1] ?? '', applied, altered: altered.join(' ') }
 }
 
 /** "G:" for G major, "e:" for E minor (the usual analysis convention). */
@@ -100,26 +111,55 @@ function romanText(chord: Chord, key: KeyRegion | null, x: number, y: number, si
   const t = text(x, y, size, `roman${functions ? ` fn-${chord.function}` : ''}`)
   if (key) t.appendChild(tspan(`${keyLabel(key)} `, { class: 'key' }))
   const r = splitRoman(chord.roman)
-  t.appendChild(tspan(r.numeral))
+  t.appendChild(tspan(r.numeral.replace(/^b/, '♭').replace(/^#/, '♯').replace('o', '°')))
+  if (r.altered) t.appendChild(tspan(`(${r.altered})`, { 'font-size': String(size * 0.62) }))
   if (r.upper && r.lower) {
     // Stacked figured-bass digits: 6 over 5.
     t.appendChild(tspan(r.upper, { dy: String(-size * 0.45), 'font-size': String(size * 0.62) }))
-    t.appendChild(tspan(r.lower, { dx: String(-size * 0.36), dy: String(size * 0.6), 'font-size': String(size * 0.62) }))
+    t.appendChild(
+      tspan(r.lower, { dx: String(-size * 0.36), dy: String(size * 0.6), 'font-size': String(size * 0.62) })
+    )
     if (r.applied) t.appendChild(tspan(r.applied, { dy: String(-size * 0.15) }))
   } else {
     if (r.upper) t.appendChild(tspan(r.upper, { dy: String(-size * 0.45), 'font-size': String(size * 0.62) }))
     if (r.applied) t.appendChild(tspan(r.applied, { dy: r.upper ? String(size * 0.45) : '0' }))
   }
+  t.appendChild(tooltip(chord))
+  return t
+}
+
+function tooltip(chord: Chord): SVGTitleElement {
   const title = document.createElementNS(SVG_NS, 'title')
-  title.textContent = `${chord.symbol} · ${chord.roman} · ${chord.function}`
-  t.appendChild(title)
+  const fn = chord.function === 'other' ? '' : ` · ${FUNCTION_NAMES[chord.function]}`
+  title.textContent = `${chordLabel(chord, 'names')} (${chordLabel(chord, 'symbols')}) · ${chord.roman}${fn}`
+  return title
+}
+
+function labelText(
+  chord: Chord,
+  key: KeyRegion | null,
+  style: ChordLabelStyle,
+  x: number,
+  y: number,
+  size: number,
+  functions: boolean
+): SVGTextElement {
+  const t = text(
+    x,
+    y,
+    size,
+    `chord-label${style === 'functions' ? ' fn-letter' : ''}${functions ? ` fn-${chord.function}` : ''}`
+  )
+  if (key) t.appendChild(tspan(`${keyLabel(key)} `, { class: 'key' }))
+  t.appendChild(tspan(chordLabel(chord, style)))
+  t.appendChild(tooltip(chord))
   return t
 }
 
 /** Extra room between systems (MEI units) so annotation rows do not collide. */
 export function systemSpacingFor(display: AnalysisDisplayOptions, hasAnalysis: boolean): number {
   if (!hasAnalysis) return 4
-  return 4 + (display.roman ? 8 : 0) + (display.symbols ? 6 : 0)
+  return 4 + (display.chords ? 8 : 0)
 }
 
 /** Top and bottom of the staves of a whole system: annotation rows stay level. */
@@ -140,7 +180,7 @@ export function drawAnalysis(
   display: AnalysisDisplayOptions
 ): void {
   clearAnalysis(root)
-  if (!display.roman && !display.symbols) return
+  if (!display.chords) return
   const measures = [...root.querySelectorAll('g.measure')]
   const keyStarts = new Map((analysis.key ?? []).map((k) => [k.fromMeasure, k]))
   const keyShown = new Set<number>()
@@ -160,19 +200,25 @@ export function drawAnalysis(
       top: Math.min(...boxes.map((b) => b.y)),
       bottom: Math.max(...boxes.map((b) => b.y + b.height))
     }
-    const { top, bottom } = extent
+    const { bottom } = extent
     const x = xAt(measure, onsets.get(measure.id), chord.offset ?? 0, Math.min(...boxes.map((b) => b.x)) + space)
 
-    if (display.symbols) {
-      const t = text(x, top - space * 1.2, size * 0.72, 'symbol')
-      t.textContent = chord.symbol
-      measure.appendChild(t)
-    }
-    if (display.roman) {
-      const region = keyStarts.get(chord.measure)
-      const key = region && !keyShown.has(chord.measure) ? region : null
-      if (key) keyShown.add(chord.measure)
-      measure.appendChild(romanText(chord, key, x, bottom + space * 3.2, size, display.functions))
-    }
+    const region = showsKey(display.labelStyle) ? keyStarts.get(chord.measure) : undefined
+    const key = region && !keyShown.has(chord.measure) ? region : null
+    if (key) keyShown.add(chord.measure)
+    const y = bottom + space * 3.2
+    measure.appendChild(
+      display.labelStyle === 'roman'
+        ? romanText(chord, key, x, y, size, display.functions)
+        : labelText(
+            chord,
+            key,
+            display.labelStyle,
+            x,
+            y,
+            size * (display.labelStyle === 'functions' ? 1 : 0.8),
+            display.functions
+          )
+    )
   }
 }

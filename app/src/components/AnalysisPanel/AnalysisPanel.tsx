@@ -1,3 +1,4 @@
+import { FUNCTION_NAMES, LABEL_STYLES, type ChordLabelStyle } from '../../lib/chordLabels'
 import { loopRange, patternColor, patternLetter, repeatedMeasures, transpositionLabel } from '../../lib/patterns'
 import { scoreDurationMs } from '../../lib/timemap'
 import { runAnalysis, useAnalysis } from '../../stores/analysis'
@@ -45,7 +46,11 @@ export function AnalysisPanel() {
       {status === 'done' && (
         <span className="analysis-keys">
           {keys.map((k, i) => (
-            <span key={`${k.fromMeasure}-${k.tonic}-${k.mode}`} className="key-chip" title={`Affidabilità ${Math.round(k.confidence * 100)}%`}>
+            <span
+              key={`${k.fromMeasure}-${k.tonic}-${k.mode}`}
+              className="key-chip"
+              title={`Affidabilità ${Math.round(k.confidence * 100)}%`}
+            >
               <strong>
                 {k.tonic} {MODE[k.mode]}
               </strong>
@@ -62,31 +67,47 @@ export function AnalysisPanel() {
       )}
       <span className="analysis-switches">
         <label>
-          <input type="checkbox" checked={display.roman} onChange={(e) => setDisplay({ roman: e.target.checked })} />
-          Numeri romani
+          <input type="checkbox" checked={display.chords} onChange={(e) => setDisplay({ chords: e.target.checked })} />
+          Accordi
         </label>
-        <label>
-          <input type="checkbox" checked={display.symbols} onChange={(e) => setDisplay({ symbols: e.target.checked })} />
-          Sigle
+        <select
+          aria-label="Come scrivere gli accordi"
+          value={display.labelStyle}
+          disabled={!display.chords}
+          title={LABEL_STYLES.find((s) => s.value === display.labelStyle)?.hint}
+          onChange={(e) => setDisplay({ labelStyle: e.target.value as ChordLabelStyle })}
+        >
+          {LABEL_STYLES.map((s) => (
+            <option key={s.value} value={s.value} title={s.hint}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <label title="Colora gli accordi secondo la funzione: tonica, sottodominante, dominante">
+          <input
+            type="checkbox"
+            checked={display.functions}
+            disabled={!display.chords}
+            onChange={(e) => setDisplay({ functions: e.target.checked })}
+          />
+          Colori
         </label>
         <label>
           <input
             type="checkbox"
-            checked={display.functions}
-            disabled={!display.roman}
-            onChange={(e) => setDisplay({ functions: e.target.checked })}
+            checked={display.patterns}
+            onChange={(e) => setDisplay({ patterns: e.target.checked })}
           />
-          Funzioni
-        </label>
-        <label>
-          <input type="checkbox" checked={display.patterns} onChange={(e) => setDisplay({ patterns: e.target.checked })} />
           Pattern
         </label>
-        {display.roman && display.functions && (
-          <span className="fn-legend">
-            <i className="fn-tonic">T</i>
-            <i className="fn-predominant">P</i>
-            <i className="fn-dominant">D</i>
+        {display.chords && (display.functions || display.labelStyle === 'functions') && (
+          <span
+            className="fn-legend"
+            title="Tonica: riposo. Sottodominante: si allontana e prepara. Dominante: tensione che chiede di tornare alla tonica. Grigio: accordi senza una di queste funzioni."
+          >
+            <i className="fn-tonic">T {FUNCTION_NAMES.tonic}</i>
+            <i className="fn-predominant">S {FUNCTION_NAMES.predominant}</i>
+            <i className="fn-dominant">D {FUNCTION_NAMES.dominant}</i>
           </span>
         )}
       </span>

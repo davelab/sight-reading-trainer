@@ -114,6 +114,21 @@ tempo, altezza), mai per ID. Il controllo automatico segnala solo le battute
 la cui durata non torna con il tempo in chiave: le altezze sbagliate (come i
 diesis persi) vanno viste confrontando con il PDF.
 
+### Etichette degli accordi (impostazione)
+
+Nel pannello dell'analisi: «Accordi» mostra o nasconde la riga sotto ogni
+sistema, il menu sceglie come scriverli, «Colori» li colora per funzione (la
+legenda dice Tonica, Sottodominante, Dominante; grigio = nessuna delle tre).
+La scelta è ricordata e vale anche per le note cadenti.
+
+| Stile | Esempio | Per chi |
+|---|---|---|
+| Nome e grado (predefinito) | Solm · iv | che accordo è e che ruolo ha |
+| Nomi (italiano) | Solm/Si♭ | leggere al pianoforte (dopo la barra il basso) |
+| Sigle | Gm/B♭ | fake book, pop e jazz |
+| Funzioni | T S D | il percorso tensione/riposo |
+| Numeri romani | iv⁶ | analisi classica con rivolti e dominanti secondarie |
+
 ### Rilettura con Claude (OMR, facoltativa)
 
 Nella correzione di un PDF, **«Migliora con Claude»** fa rileggere a Claude le

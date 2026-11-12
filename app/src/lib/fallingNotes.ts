@@ -32,6 +32,7 @@ export function visibleEvents(
 export interface TimedLabel {
   ms: number
   label: string
+  fn: Chord['function']
 }
 
 /**
@@ -43,7 +44,8 @@ export function chordTimes(
   measureIds: readonly string[],
   measures: readonly MeasureStart[],
   onsets: ReadonlyMap<string, MeasureOnset[]>,
-  events: readonly PlaybackEvent[]
+  events: readonly PlaybackEvent[],
+  label: (c: Chord) => string = (c) => c.symbol
 ): TimedLabel[] {
   const onsetMs = new Map(events.map((e) => [e.noteId, e.onsetMs]))
   const startOf = new Map<string, number>()
@@ -71,7 +73,7 @@ export function chordTimes(
       const slope = b[0] !== a[0] ? (b[1] - a[1]) / (b[0] - a[0]) : 500
       ms = a[1] + (q - a[0]) * slope
     }
-    out.push({ ms, label: c.symbol })
+    out.push({ ms, label: label(c), fn: c.function })
   }
   return out
 }
