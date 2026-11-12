@@ -5,7 +5,7 @@ import zipfile
 
 from score_engine import __version__
 from score_engine.methods import dispatcher
-from score_engine.rpc import INVALID_PARAMS, METHOD_NOT_FOUND, NOT_IMPLEMENTED, PARSE_ERROR
+from score_engine.rpc import INVALID_PARAMS, METHOD_NOT_FOUND, PARSE_ERROR
 
 
 def call(method, params=None, req_id=1):
@@ -31,8 +31,19 @@ def test_notification_has_no_response():
     assert dispatcher.handle_line('{"jsonrpc":"2.0","method":"ping"}') is None
 
 
-def test_planned_methods_report_not_implemented():
-    assert call("omr.run", {"pdfPath": "x.pdf"})["error"]["code"] == NOT_IMPLEMENTED
+def test_omr_run_validates_its_input():
+    assert call("omr.run", {"pdfPath": "/nope.pdf"})["error"]["code"] == INVALID_PARAMS
+    assert call("omr.run", {})["error"]["code"] == INVALID_PARAMS
+
+
+def test_score_edit_and_check(minuet_path):
+    xml = minuet_path.read_text()
+    note = {"measure": 1, "staff": 1, "offset": 0, "pitch": 74}
+    result = call("score.edit", {"musicxml": xml, "note": note, "action": "step-up"})["result"]
+    assert result["warnings"] == [] and result["musicxml"] != xml
+    bad = call("score.edit", {"musicxml": xml, "note": note, "action": "explode"})
+    assert bad["error"]["code"] == INVALID_PARAMS
+    assert call("score.check", {"musicxml": xml})["result"]["warnings"] == []
 
 
 def test_analyze_returns_the_analysis_schema(minuet_path):

@@ -2,16 +2,53 @@
 
 from __future__ import annotations
 
+import json
+import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from . import __version__, analysis
-from .io import musicxml
+from .io import correct, musicxml
 from .io import musicxml as musicxml_io
-from .models import Analysis, NormalizeResult, PingResult
-from .rpc import INVALID_PARAMS, NOT_IMPLEMENTED, Dispatcher, RpcError
+from .models import Analysis, CheckResult, EditAction, NormalizeResult, NoteRef, PingResult
+from .rpc import INVALID_PARAMS, Dispatcher, RpcError
 
 dispatcher = Dispatcher()
+
+# Notifications (JSON-RPC messages without id) sent by background jobs. The
+# stdio loop installs a writer; until then they are dropped.
+_notify_lock = threading.Lock()
+_writer: Callable[[str], None] | None = None
+
+
+def set_writer(writer: Callable[[str], None]) -> None:
+    global _writer
+    _writer = writer
+
+
+def notify(method: str, params: dict[str, Any]) -> None:
+    line = json.dumps(
+        {"jsonrpc": "2.0", "method": method, "params": params},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    with _notify_lock:
+        if _writer is not None:
+            _writer(line)
+
+
+_jobs = None
+
+
+def jobs():
+    """The OMR job runner, created on first use (imports nothing heavy before)."""
+    global _jobs
+    if _jobs is None:
+        from .omr.jobs import OmrJobs
+
+        _jobs = OmrJobs(notify)
+    return _jobs
 
 
 def _require_str(params: dict[str, Any], key: str) -> str:
@@ -43,6 +80,61 @@ def analyze(params: dict[str, Any]) -> Analysis:
         raise RpcError(INVALID_PARAMS, str(e)) from e
 
 
+@dispatcher.method("score.check")
+def score_check(params: dict[str, Any]) -> CheckResult:
+    """Likely recognition errors (measures that do not add up)."""
+    musicxml = _require_str(params, "musicxml")
+    try:
+        return CheckResult(musicxml=musicxml, warnings=correct.check(musicxml))
+    except correct.EditError as e:
+        raise RpcError(INVALID_PARAMS, str(e)) from e
+
+
+@dispatcher.method("score.edit")
+def score_edit(params: dict[str, Any]) -> CheckResult:
+    """Correct one note, found by position; returns the new MusicXML and its warnings."""
+    musicxml = _require_str(params, "musicxml")
+    action = params.get("action")
+    if action not in get_args(EditAction):
+        raise RpcError(INVALID_PARAMS, f"unknown action: {action!r}")
+    try:
+        ref = NoteRef.model_validate(params.get("note"))
+    except ValueError as e:
+        raise RpcError(INVALID_PARAMS, f"invalid note: {e}") from e
+    from fractions import Fraction
+
+    from .io.xml_walk import NoteRef as Ref
+
+    try:
+        edited = correct.apply_edit(
+            musicxml,
+            Ref(ref.measure, ref.staff, Fraction(ref.offset).limit_denominator(96), ref.pitch),
+            action,
+        )
+        return CheckResult(musicxml=edited, warnings=correct.check(edited))
+    except correct.EditError as e:
+        raise RpcError(INVALID_PARAMS, str(e)) from e
+
+
 @dispatcher.method("omr.run")
-def omr_run(_params: dict[str, Any]) -> None:
-    raise RpcError(NOT_IMPLEMENTED, "omr.run is planned for milestone M5")
+def omr_run(params: dict[str, Any]) -> dict[str, str]:
+    """Start recognising a PDF in the background; progress arrives as notifications."""
+    path = Path(_require_str(params, "pdfPath"))
+    if not path.is_file():
+        raise RpcError(INVALID_PARAMS, f"file not found: {path}")
+    pages = params.get("pages")
+    if pages is not None and not (
+        isinstance(pages, list) and all(isinstance(p, int) for p in pages)
+    ):
+        raise RpcError(INVALID_PARAMS, "pages must be a list of page numbers")
+    from .omr.render import PdfError
+
+    try:
+        return {"jobId": jobs().start(path, pages)}
+    except PdfError as e:
+        raise RpcError(INVALID_PARAMS, str(e)) from e
+
+
+@dispatcher.method("omr.cancel")
+def omr_cancel(params: dict[str, Any]) -> dict[str, bool]:
+    return {"cancelled": jobs().cancel(_require_str(params, "jobId"))}

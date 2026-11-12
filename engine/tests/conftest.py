@@ -30,3 +30,17 @@ def chorale(tmp_path_factory):
         return cache[name]
 
     return get
+
+
+def overfill_measure_4(xml: str) -> str:
+    """Minuet with measure 4's right-hand G5 a quarter too long, as an OMR error would be.
+
+    The <backup> grows too, as a MusicXML writer backs up over what it wrote.
+    """
+    head, rest = xml.split('<measure number="4">', 1)
+    body, tail = rest.split("</measure>", 1)
+    g5 = "<step>G</step><octave>5</octave></pitch><duration>2</duration>"
+    assert g5 in body
+    body = body.replace(g5, g5.replace("<duration>2", "<duration>4"), 1)
+    body = body.replace("<backup><duration>6</duration>", "<backup><duration>8</duration>", 1)
+    return head + '<measure number="4">' + body + "</measure>" + tail

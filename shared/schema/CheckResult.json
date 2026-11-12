@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "OmrWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "staff": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "duration",
+            "page"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "measure",
+        "kind",
+        "message"
+      ],
+      "title": "OmrWarning",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of ``score.check`` and ``score.edit``.",
+  "properties": {
+    "musicxml": {
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/OmrWarning"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "musicxml",
+    "warnings"
+  ],
+  "title": "CheckResult",
+  "type": "object"
+}

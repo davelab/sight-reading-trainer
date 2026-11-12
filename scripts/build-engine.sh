@@ -21,14 +21,32 @@ TRIPLE="${TARGET_TRIPLE:-$(rustc -vV | sed -n 's/^host: //p')}"
 OUT="$ROOT/app/src-tauri/binaries"
 WORK="$ROOT/engine/build"
 
-cd "$ROOT/engine"
-uv run --quiet --with 'pyinstaller>=6' pyinstaller \
-  --onefile --noconfirm --clean \
-  --name "engine-$TRIPLE" \
-  --distpath "$OUT" --workpath "$WORK" --specpath "$WORK" \
-  pyinstaller_entry.py
-echo "built $OUT/engine-$TRIPLE" >&2
+# Two sidecars from the same package (docs/SPEC.md, risks: sidecar size):
+#   engine  analysis only, light, starts fast;
+#   omr     PDF import with homr (AGPL-3.0), onnxruntime and OpenCV.
+# Pass "engine" or "omr" to build only one.
+WHAT="${1:-all}"
 
-# Smoke test: the binary must answer ping on stdout.
-echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | "$OUT/engine-$TRIPLE" 2>/dev/null | grep -q '"version"' \
-  && echo "ping OK" >&2
+build() {
+  local name="$1"; shift
+  (cd "$ROOT/engine" && uv run --quiet --with 'pyinstaller>=6' pyinstaller \
+    --onefile --noconfirm --clean --log-level WARN \
+    --name "$name-$TRIPLE" \
+    --distpath "$OUT" --workpath "$WORK/$name" --specpath "$WORK" \
+    "$@" pyinstaller_entry.py)
+  echo "built $OUT/$name-$TRIPLE" >&2
+  # Smoke test: the binary must answer ping on stdout.
+  echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | "$OUT/$name-$TRIPLE" 2>/dev/null | grep -q '"version"' \
+    && echo "$name: ping OK" >&2
+}
+
+if [[ "$WHAT" == all || "$WHAT" == engine ]]; then
+  build engine \
+    --exclude-module homr --exclude-module onnxruntime --exclude-module cv2 \
+    --exclude-module rapidocr --exclude-module pypdfium2
+fi
+if [[ "$WHAT" == all || "$WHAT" == omr ]]; then
+  build omr \
+    --collect-data homr --collect-all rapidocr --collect-all pypdfium2 \
+    --collect-binaries onnxruntime
+fi

@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "OmrWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "staff": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "duration",
+            "page"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "measure",
+        "kind",
+        "message"
+      ],
+      "title": "OmrWarning",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Payload of the ``omr.done`` notification.",
+  "properties": {
+    "jobId": {
+      "type": "string"
+    },
+    "musicxml": {
+      "type": "string"
+    },
+    "pages": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "previews": {
+      "description": "One data: URI image per recognised page",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/OmrWarning"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "jobId",
+    "musicxml",
+    "pages",
+    "previews",
+    "warnings"
+  ],
+  "title": "OmrResult",
+  "type": "object"
+}

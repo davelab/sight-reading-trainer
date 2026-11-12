@@ -2,3 +2,4 @@
 /gen/schemas
 /resources/*.sf2
 /binaries/engine-*
+/binaries/omr-*

@@ -8,6 +8,8 @@ license = { text = "MIT" }
 dependencies = [
     "pydantic>=2.7,<3",
     "music21>=9.1",
+    "homr[cpu]==0.7.1",  # pinned: omr/homr_backend.py patches its model paths
+    "pypdfium2>=4",
 ]
 
 [dependency-groups]

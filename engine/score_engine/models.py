@@ -105,8 +105,60 @@ class NormalizeResult(_Model):
     parts: list[PartInfo]
 
 
+# --- OMR import and correction ----------------------------------------------------
+
+
+class NoteRef(_Model):
+    """A note found by position (never by ID): what the review screen sends to edit."""
+
+    measure: int = Field(ge=1, description="Measure ordinal in the written score")
+    staff: int = Field(ge=1, description="Global staff number: staves of all parts in order")
+    offset: float = Field(ge=0, description="Onset in quarter notes from the downbeat")
+    pitch: int = Field(ge=0, le=127, description="MIDI pitch")
+
+
+EditAction = Literal["step-up", "step-down", "sharp", "flat", "natural", "delete"]
+
+
+class OmrWarning(_Model):
+    measure: int = Field(ge=1)
+    staff: int | None = None
+    kind: Literal["duration", "page"]
+    message: str
+
+
+class CheckResult(_Model):
+    """Result of ``score.check`` and ``score.edit``."""
+
+    musicxml: str
+    warnings: list[OmrWarning]
+
+
+class OmrResult(_Model):
+    """Payload of the ``omr.done`` notification."""
+
+    job_id: str = Field(alias="jobId")
+    musicxml: str
+    pages: int = Field(ge=1)
+    previews: list[str] = Field(description="One data: URI image per recognised page")
+    warnings: list[OmrWarning]
+
+
+class OmrProgress(_Model):
+    """Payload of the ``omr.progress`` notification."""
+
+    job_id: str = Field(alias="jobId")
+    stage: Literal["render", "download", "recognize", "merge"]
+    page: int = Field(ge=0)
+    total: int = Field(ge=0)
+
+
 EXPORTED_MODELS: dict[str, type[BaseModel]] = {
     "Analysis": Analysis,
     "PingResult": PingResult,
     "NormalizeResult": NormalizeResult,
+    "NoteRef": NoteRef,
+    "CheckResult": CheckResult,
+    "OmrResult": OmrResult,
+    "OmrProgress": OmrProgress,
 }
