@@ -109,7 +109,26 @@ class HomrBackend:
         )
         from homr.music_xml_generator import XmlGeneratorArguments
 
-        return Path(self._main.process_image(str(image), config, XmlGeneratorArguments()))
+        from .symbols import symbols_to_musicxml
+
+        # Keep homr's recognised symbols and write the MusicXML ourselves: homr's
+        # writer places notes in time by voice labels the model often gets wrong
+        # (see omr/symbols.py).
+        captured: list = []
+        original = self._main.generate_xml
+
+        def capture(args, staffs, title):  # noqa: ANN001 - homr's signature
+            captured.append(staffs)
+            return original(args, staffs, title)
+
+        self._main.generate_xml = capture
+        try:
+            out = Path(self._main.process_image(str(image), config, XmlGeneratorArguments()))
+        finally:
+            self._main.generate_xml = original
+        if captured:
+            out.write_text(symbols_to_musicxml(captured[-1]), encoding="utf-8")
+        return out
 
     def merge(self, pages: list[Path], out: Path) -> Path:
         # Not homr's relieur: it loses <divisions> across pages (see omr/merge.py).
