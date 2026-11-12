@@ -113,3 +113,11 @@ button.link {
 .omr-claude button {
   margin-left: auto;
 }
+.omr-review-bar.collapsed > .omr-row:not(:first-child) {
+  display: none;
+}
+.collapse-toggle {
+  padding: 0 6px;
+  min-width: 26px;
+  font-size: 13px;
+}

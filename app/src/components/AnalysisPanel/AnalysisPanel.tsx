@@ -1,4 +1,7 @@
-import { FUNCTION_NAMES, LABEL_STYLES, type ChordLabelStyle } from '../../lib/chordLabels'
+import { FUNCTION_NAMES, LABEL_STYLES, italianName, type ChordLabelStyle } from '../../lib/chordLabels'
+import { inTauri, ipc } from '../../lib/ipc'
+import { revealMeasure } from '../../lib/overlay'
+import { useView } from '../../stores/view'
 import { loopRange, patternColor, patternLetter, repeatedMeasures, transpositionLabel } from '../../lib/patterns'
 import { scoreDurationMs } from '../../lib/timemap'
 import { runAnalysis, useAnalysis } from '../../stores/analysis'
@@ -7,10 +10,20 @@ import { loopOn, useTransport } from '../../stores/transport'
 import './AnalysisPanel.css'
 
 const MODE = { major: 'maggiore', minor: 'minore' } as const
+const KIND = { exact: 'identica', transposed: 'trasposta', variant: 'variata' } as const
 
 /** Key regions, analysis status and display switches, in a bar above the score. */
 export function AnalysisPanel() {
   const { analysis, status, error, display, setDisplay, selectedPattern } = useAnalysis()
+  const keysCollapsed = useView((s) => s.keysCollapsed)
+  const patternsCollapsed = useView((s) => s.patternsCollapsed)
+  const setView = useView((s) => s.set)
+  // Measure (ordinal) under the cursor: re-renders only when it changes.
+  const atMeasure = useTransport((t) => {
+    const { measures, measureIds } = useScore.getState()
+    const current = [...measures].reverse().find((m) => m.ms <= t.positionMs + 1)
+    return Math.max(1, current ? measureIds.indexOf(current.measureId) + 1 : 1)
+  })
   const musicxml = useScore((s) => s.musicxml)
   const labels = useScore((s) => s.measureLabels)
   const measureIds = useScore((s) => s.measureIds)
@@ -33,6 +46,13 @@ export function AnalysisPanel() {
 
   const label = (ordinal: number) => labels[ordinal - 1] ?? String(ordinal)
   const keys = analysis?.key ?? []
+  const currentKey = keys.find((k) => k.fromMeasure <= atMeasure && atMeasure <= k.toMeasure) ?? keys[0]
+  const goToMeasure = (ordinal: number) => {
+    const start = measureStarts.find((m) => m.measureId === measureIds[ordinal - 1])
+    if (start && inTauri) void ipc.seek(start.ms)
+    const view = document.querySelector('.score-view')
+    if (view) revealMeasure(view, measureIds, ordinal)
+  }
 
   return (
     <div className="analysis-panel">
@@ -43,26 +63,37 @@ export function AnalysisPanel() {
           <button onClick={() => void runAnalysis(musicxml)}>Riprova</button>
         </span>
       )}
-      {status === 'done' && (
-        <span className="analysis-keys">
-          {keys.map((k, i) => (
-            <span
+      {status === 'done' && keys.length > 0 && (
+        <span className={`analysis-keys${keysCollapsed ? ' collapsed' : ''}`}>
+          {keys.length > 1 && (
+            <button
+              className="collapse-toggle"
+              aria-expanded={!keysCollapsed}
+              onClick={() => setView({ keysCollapsed: !keysCollapsed })}
+              title={keysCollapsed ? 'Mostra tutte le zone tonali' : 'Riduci: solo la tonalità del punto in cui sei'}
+            >
+              {keysCollapsed ? '▸' : '▾'}
+            </button>
+          )}
+          <span className="analysis-label">Tonalità</span>
+          {(keysCollapsed && keys.length > 1 ? keys.filter((k) => k === currentKey) : keys).map((k) => (
+            <button
               key={`${k.fromMeasure}-${k.tonic}-${k.mode}`}
-              className="key-chip"
-              title={`Affidabilità ${Math.round(k.confidence * 100)}%`}
+              className={`key-chip${k === currentKey && keys.length > 1 ? ' current' : ''}`}
+              title={`Affidabilità ${Math.round(k.confidence * 100)}% · clic: vai a battuta ${label(k.fromMeasure)}`}
+              onClick={() => goToMeasure(k.fromMeasure)}
             >
               <strong>
-                {k.tonic} {MODE[k.mode]}
+                {italianName(k.tonic)} {MODE[k.mode]}
               </strong>
-              {keys.length > 1 && (
-                <span className="range">
-                  {' '}
-                  batt. {label(k.fromMeasure)}–{label(k.toMeasure)}
-                </span>
-              )}
-              {i === 0 && keys.length === 1 && <span className="range"> (tutto il brano)</span>}
-            </span>
+              <span className="range">
+                {keys.length > 1 ? ` batt. ${label(k.fromMeasure)}–${label(k.toMeasure)}` : ' (tutto il brano)'}
+              </span>
+            </button>
           ))}
+          {keysCollapsed && keys.length > 1 && (
+            <span className="analysis-more">{keys.length} zone tonali (modulazioni) · ▸ per vederle tutte</span>
+          )}
         </span>
       )}
       <span className="analysis-switches">
@@ -112,39 +143,53 @@ export function AnalysisPanel() {
         )}
       </span>
       {status === 'done' && display.patterns && patterns.length > 0 && (
-        <div className="pattern-list">
+        <div className={`pattern-list${patternsCollapsed ? ' collapsed' : ''}`}>
+          <button
+            className="collapse-toggle"
+            aria-expanded={!patternsCollapsed}
+            onClick={() => setView({ patternsCollapsed: !patternsCollapsed })}
+            title={patternsCollapsed ? 'Mostra le frasi ripetute' : 'Riduci a una riga'}
+          >
+            {patternsCollapsed ? '▸' : '▾'}
+          </button>
+          <span className="analysis-label">Frasi ripetute</span>
           <span className="pattern-summary">
-            {repeated} battute su {labels.length} ripetono una frase già vista
+            {patterns.length} {patterns.length === 1 ? 'frase' : 'frasi'} che tornano: {repeated} battute su{' '}
+            {labels.length} sono già viste altrove
+            {patternsCollapsed
+              ? ''
+              : ' — passa sopra una frase per colorarla in partitura, clic su un numero per ripeterla in loop'}
           </span>
-          {patterns.map((p, i) => (
-            <span
-              key={p.id}
-              className={`pattern-chip${selectedPattern === p.id ? ' selected' : ''}`}
-              style={{ ['--pattern' as string]: patternColor(i) }}
-              onMouseEnter={() => useAnalysis.setState({ selectedPattern: p.id })}
-              onMouseLeave={() => useAnalysis.setState({ selectedPattern: null })}
-              title={`${p.kind === 'exact' ? 'Identica' : 'Trasposta'}, ${p.length} battute. Clic su un numero: loop di quella ricorrenza`}
-            >
-              <i className="swatch" />
-              <strong>{patternLetter(i)}</strong>
-              <span className="pattern-meta">
-                {p.length} batt.{p.kind === 'transposed' ? ' · trasposta' : ''}
-                {handName[p.hands ?? 'both']}
+          {!patternsCollapsed &&
+            patterns.map((p, i) => (
+              <span
+                key={p.id}
+                className={`pattern-chip${selectedPattern === p.id ? ' selected' : ''}`}
+                style={{ ['--pattern' as string]: patternColor(i) }}
+                onMouseEnter={() => useAnalysis.setState({ selectedPattern: p.id })}
+                onMouseLeave={() => useAnalysis.setState({ selectedPattern: null })}
+              >
+                <i className="swatch" />
+                <strong>{patternLetter(i)}</strong>
+                <span className="pattern-meta">
+                  {p.length} {p.length === 1 ? 'battuta' : 'battute'} · {KIND[p.kind]}
+                  {handName[p.hands ?? 'both']} · alle battute
+                </span>
+                {p.occurrences.map((start, occ) => (
+                  <button
+                    key={start}
+                    className={isLooped(start, p.length) ? 'looped' : ''}
+                    onClick={() => loopOccurrence(start, p.length)}
+                    title={`Loop delle battute ${label(start)}–${label(start + p.length - 1)}`}
+                  >
+                    {label(start)}
+                    {occ > 0 && transpositionLabel(p.transpositions?.[occ]) && (
+                      <small> {transpositionLabel(p.transpositions?.[occ])}</small>
+                    )}
+                  </button>
+                ))}
               </span>
-              {p.occurrences.map((start, occ) => (
-                <button
-                  key={start}
-                  className={isLooped(start, p.length) ? 'looped' : ''}
-                  onClick={() => loopOccurrence(start, p.length)}
-                >
-                  {labels[start - 1] ?? start}
-                  {occ > 0 && transpositionLabel(p.transpositions?.[occ]) && (
-                    <small> {transpositionLabel(p.transpositions?.[occ])}</small>
-                  )}
-                </button>
-              ))}
-            </span>
-          ))}
+            ))}
         </div>
       )}
     </div>

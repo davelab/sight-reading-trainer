@@ -14,6 +14,7 @@ import {
   useOmr
 } from '../../stores/omr'
 import { useScore } from '../../stores/score'
+import { useView } from '../../stores/view'
 import './OmrReview.css'
 
 const VALUES: { value: NoteValue; key: string; label: string; name: string }[] = [
@@ -140,6 +141,8 @@ export function OmrReviewBar() {
   const labels = useScore((s) => s.measureLabels)
   const measureIds = useScore((s) => s.measureIds)
   const [showAll, setShowAll] = useState(false)
+  const collapsed = useView((s) => s.reviewCollapsed)
+  const setView = useView((s) => s.set)
 
   // One chip per measure: both hands' messages go in its tooltip.
   const byMeasure = new Map<number, string[]>()
@@ -179,12 +182,24 @@ export function OmrReviewBar() {
   }
 
   return (
-    <div className="omr-review-bar">
+    <div className={`omr-review-bar${collapsed ? ' collapsed' : ''}`}>
       <div className="omr-row">
+        <button
+          className="collapse-toggle"
+          aria-expanded={!collapsed}
+          onClick={() => setView({ reviewCollapsed: !collapsed })}
+          title={
+            collapsed
+              ? 'Mostra gli strumenti di correzione'
+              : 'Riduci la barra a una riga (le scorciatoie restano attive)'
+          }
+        >
+          {collapsed ? '▸' : '▾'}
+        </button>
         <strong>
           {source === 'audio' ? 'Trascrizione di' : 'Correzione di'} «{fileName}»
         </strong>
-        {source === 'audio' && facts ? (
+        {collapsed ? null : source === 'audio' && facts ? (
           <span className="omr-hint">
             {facts.beatsPerMeasure}/4 · ♩ = {facts.tempo} · {keyName(facts.key)}
             {facts.pickupBeats > 0 ? ` · anacrusi di ${facts.pickupBeats}` : ''}. Ascoltala con ▶ e clic su una nota per
@@ -194,6 +209,16 @@ export function OmrReviewBar() {
           <span className="omr-hint">
             Confronta con il PDF a sinistra; clic su una nota per correggerla. Per correzioni più ampie salva il
             MusicXML e aprilo in MuseScore.
+          </span>
+        )}
+        {collapsed && (
+          <span className="omr-hint">
+            {selected
+              ? `${pitchName(selected.pitch)} · batt. ${labels[selected.measure - 1] ?? selected.measure} · `
+              : ''}
+            {measures.length === 0
+              ? 'nessuna battuta sospetta'
+              : `${measures.length} ${measures.length === 1 ? 'battuta sospetta' : 'battute sospette'}`}
           </span>
         )}
         <span className="omr-actions">

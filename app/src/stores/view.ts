@@ -34,6 +34,10 @@ export interface ViewSettings {
   aidNoteNames: boolean
   aidIntervals: boolean
   aidChordShapes: boolean
+  /** Bars reduced to one line. */
+  reviewCollapsed: boolean
+  patternsCollapsed: boolean
+  keysCollapsed: boolean
 }
 
 export const TOLERANCE_MS = { strict: 80, normal: 130, loose: 200 } as const
@@ -58,7 +62,10 @@ export const DEFAULT_VIEW: ViewSettings = {
   lookahead: 'off',
   aidNoteNames: false,
   aidIntervals: false,
-  aidChordShapes: false
+  aidChordShapes: false,
+  reviewCollapsed: false,
+  patternsCollapsed: false,
+  keysCollapsed: true
 }
 
 const STORAGE_KEY = 'view-settings'

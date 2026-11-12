@@ -104,3 +104,27 @@
   border-color: var(--pattern);
   color: white;
 }
+.analysis-keys,
+.pattern-list {
+  align-items: center;
+}
+.analysis-label {
+  font-weight: 700;
+  margin-right: 2px;
+}
+.analysis-more {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.key-chip {
+  cursor: pointer;
+}
+.key-chip.current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.collapse-toggle {
+  padding: 0 6px;
+  min-width: 26px;
+  font-size: 13px;
+}
