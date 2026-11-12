@@ -11,7 +11,16 @@ from typing import Any, get_args
 from . import __version__, analysis
 from .io import correct, musicxml
 from .io import musicxml as musicxml_io
-from .models import Analysis, CheckResult, EditAction, NormalizeResult, NoteRef, PingResult
+from .models import (
+    Analysis,
+    CheckResult,
+    EditAction,
+    KeptMeasure,
+    NormalizeResult,
+    NoteRef,
+    PingResult,
+    RefineResult,
+)
 from .rpc import INVALID_PARAMS, Dispatcher, RpcError
 
 dispatcher = Dispatcher()
@@ -191,3 +200,31 @@ def transcribe_run(params: dict[str, Any]) -> dict[str, str]:
 @dispatcher.method("transcribe.cancel")
 def transcribe_cancel(params: dict[str, Any]) -> dict[str, bool]:
     return {"cancelled": tx_jobs().cancel(_require_str(params, "jobId"))}
+
+
+@dispatcher.method("omr.refine")
+def omr_refine(params: dict[str, Any]) -> RefineResult:
+    """Claude reads the suspicious measures (plus `extraMeasures`) again from the PDF."""
+    from .omr.refine import RefineError, refine, suspicious_measures
+    from .omr.render import PdfError, page_count
+
+    pdf = Path(_require_str(params, "pdfPath"))
+    musicxml = _require_str(params, "musicxml")
+    api_key = _require_str(params, "apiKey")
+    extra = params.get("extraMeasures") or []
+    if not (isinstance(extra, list) and all(isinstance(m, int) and m >= 1 for m in extra)):
+        raise RpcError(INVALID_PARAMS, "extraMeasures must be a list of measure numbers")
+    if not pdf.is_file():
+        raise RpcError(INVALID_PARAMS, f"file not found: {pdf}")
+    try:
+        pages = list(range(1, page_count(pdf) + 1))
+        measures = sorted(set(suspicious_measures(musicxml)) | set(extra))
+        out = refine(musicxml, pdf, pages, measures, api_key)
+    except (RefineError, PdfError) as e:
+        raise RpcError(INVALID_PARAMS, str(e)) from e
+    return RefineResult(
+        musicxml=out.musicxml,
+        warnings=correct.check(out.musicxml),
+        changed=out.changed,
+        kept=[KeptMeasure(measure=m, reason=r) for m, r in out.kept],
+    )

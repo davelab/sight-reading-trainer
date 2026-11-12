@@ -24,6 +24,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 roxmltree = "0.20"
 log = "0.4"
 midir = "0.10"
+keyring = { version = "3", features = ["apple-native"] }
 
 [profile.release]
 lto = true

@@ -24,7 +24,8 @@ WORK="$ROOT/engine/build"
 # Two sidecars from the same package (docs/SPEC.md, risks: sidecar size):
 #   engine  analysis only, light, starts fast;
 #   omr     PDF import with homr (AGPL-3.0), onnxruntime and OpenCV, and
-#           audio transcription (same onnxruntime, plus libsndfile and scipy).
+#           audio transcription (same onnxruntime, plus libsndfile and scipy),
+#           and the second reading of measures by Claude (anthropic SDK).
 # Pass "engine" or "omr" to build only one.
 WHAT="${1:-all}"
 
@@ -58,7 +59,7 @@ if [[ "$WHAT" == all || "$WHAT" == engine ]]; then
   build engine \
     --exclude-module homr --exclude-module onnxruntime --exclude-module cv2 \
     --exclude-module rapidocr --exclude-module pypdfium2 \
-    --exclude-module soundfile --exclude-module scipy
+    --exclude-module soundfile --exclude-module scipy --exclude-module anthropic
 fi
 if [[ "$WHAT" == all || "$WHAT" == omr ]]; then
   build omr \

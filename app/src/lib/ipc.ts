@@ -11,6 +11,7 @@ import type {
   NoteRef,
   OmrProgress,
   OmrResult,
+  RefineResult,
   TranscribeHints,
   TranscribeProgress,
   TranscribeResult
@@ -95,6 +96,12 @@ export const ipc = {
   saveTextFile: (path: string, contents: string) => invoke<void>('save_text_file', { path, contents }),
   saveBinaryFile: (path: string, contents: Uint8Array) =>
     invoke<void>('save_binary_file', { path, contents: Array.from(contents) }),
+  /** Claude reads the suspicious measures (and `extraMeasures`) of a recognised PDF again. */
+  omrRefine: (pdfPath: string, musicxml: string, extraMeasures: number[]) =>
+    invoke<RefineResult>('omr_refine', { pdfPath, musicxml, extraMeasures }),
+  /** Whether a Claude API key is in the Keychain (the key never comes back). */
+  apiKeyStatus: () => invoke<boolean>('api_key_status'),
+  setApiKey: (key: string | null) => invoke<void>('set_api_key', { key }),
   /** Start transcribing a piano recording; progress and result arrive as transcribe:* events. */
   transcribeAudio: (path: string, hints: TranscribeHints = {}) =>
     invoke<{ jobId: string }>('transcribe_audio', { path, hints }),

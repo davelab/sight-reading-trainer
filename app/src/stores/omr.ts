@@ -14,7 +14,15 @@ import {
 } from '../lib/ipc'
 import { openMusicXml } from '../lib/loadScore'
 import { findNote } from '../lib/noteRefs'
-import type { NoteRef, OmrProgress, OmrWarning, TranscribeFacts, TranscribeHints, TranscribeProgress } from '../types'
+import type {
+  NoteRef,
+  OmrProgress,
+  OmrWarning,
+  RefineResult,
+  TranscribeFacts,
+  TranscribeHints,
+  TranscribeProgress
+} from '../types'
 import { runAnalysis } from './analysis'
 import { useScore } from './score'
 
@@ -27,6 +35,13 @@ export interface OmrState {
   phase: 'idle' | 'setup' | 'running' | 'review' | 'error'
   /** Audio file waiting for the user's hints (phase 'setup'). */
   pendingPath: string | null
+  /** The imported PDF (for Claude's second reading). */
+  pdfPath: string | null
+  /** Claude is reading measures again; what came of the last reading. */
+  refining: boolean
+  refineReport: string | null
+  /** The «Claude API key» dialog is open. */
+  keyDialog: boolean
   /** Where the score comes from: a PDF (OMR) or a recording (transcription). */
   source: 'pdf' | 'audio'
   jobId: string | null
@@ -51,6 +66,10 @@ export interface OmrState {
 const initial: Omit<OmrState, never> = {
   phase: 'idle',
   pendingPath: null,
+  pdfPath: null,
+  refining: false,
+  refineReport: null,
+  keyDialog: false,
   source: 'pdf',
   jobId: null,
   fileName: null,
@@ -77,7 +96,7 @@ export async function startPdfImport(path: string): Promise<void> {
     useOmr.setState({ ...initial, phase: 'error', error: "L'import da PDF richiede l'app desktop" })
     return
   }
-  useOmr.setState({ ...initial, phase: 'running', fileName: baseName(path) })
+  useOmr.setState({ ...initial, phase: 'running', fileName: baseName(path), pdfPath: path })
   try {
     const { jobId } = await ipc.importPdf(path)
     // Progress events may already have arrived for this job: keep them.
@@ -214,6 +233,51 @@ export async function correct(action: EditAction, value?: NoteValue): Promise<vo
     useOmr.setState({ error: String(e) })
   } finally {
     useOmr.setState({ busy: false })
+  }
+}
+
+/** Italian list: "6", "6 e 8", "6, 7 e 8". */
+export function listMeasures(ms: number[]): string {
+  return ms.length < 2 ? ms.join('') : `${ms.slice(0, -1).join(', ')} e ${ms[ms.length - 1]}`
+}
+
+/** What a second reading did, in one sentence. */
+export function refineSummary(r: RefineResult): string {
+  const parts: string[] = []
+  if (r.changed.length) {
+    parts.push(`Claude ha riscritto ${r.changed.length > 1 ? 'le battute' : 'la battuta'} ${listMeasures(r.changed)}.`)
+  }
+  if (r.kept.length) {
+    const why = r.kept.map((k) => `${k.measure} (${k.reason})`).join('; ')
+    parts.push(`${r.kept.length > 1 ? 'Rimaste' : 'Rimasta'} com'era: ${why}.`)
+  }
+  return parts.join(' ') || 'Nessuna battuta sospetta da rileggere: seleziona una nota della battuta da far rileggere.'
+}
+
+/**
+ * Claude reads the suspicious measures again from the PDF, plus the measure of the
+ * selected note. Asks for the API key first if there is none.
+ */
+export async function refineWithClaude(): Promise<void> {
+  const s = useOmr.getState()
+  if (!s.musicxml || !s.pdfPath || s.busy || s.refining) return
+  if (!(await ipc.apiKeyStatus())) {
+    useOmr.setState({ keyDialog: true })
+    return
+  }
+  useOmr.setState({ refining: true, refineReport: null, error: null })
+  try {
+    const extra = s.selected ? [s.selected.measure] : []
+    const result = await ipc.omrRefine(s.pdfPath, s.musicxml, extra)
+    if (result.changed.length) {
+      useOmr.setState({ musicxml: result.musicxml, warnings: result.warnings, history: [...s.history, s.musicxml] })
+      await show(result.musicxml, null)
+    }
+    useOmr.setState({ refineReport: refineSummary(result) })
+  } catch (e) {
+    useOmr.setState({ error: String(e) })
+  } finally {
+    useOmr.setState({ refining: false })
   }
 }
 

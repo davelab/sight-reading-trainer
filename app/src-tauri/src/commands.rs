@@ -297,6 +297,63 @@ pub async fn transcribe_cancel(state: State<'_, AppState>, job_id: String) -> Cm
     .map_err(|e| e.to_string())?
 }
 
+// --- Claude API key (macOS Keychain) and second reading of measures -----------
+
+const KEYCHAIN_SERVICE: &str = "Score Studio";
+const KEYCHAIN_ACCOUNT: &str = "anthropic-api-key";
+
+fn keychain() -> CmdResult<keyring::Entry> {
+    keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT).map_err(|e| format!("Portachiavi non disponibile: {e}"))
+}
+
+fn stored_api_key() -> CmdResult<Option<String>> {
+    match keychain()?.get_password() {
+        Ok(key) => Ok(Some(key)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(format!("impossibile leggere la chiave dal Portachiavi: {e}")),
+    }
+}
+
+/// Whether a Claude API key is stored (the key itself never goes to the frontend).
+#[tauri::command]
+pub fn api_key_status() -> CmdResult<bool> {
+    Ok(stored_api_key()?.is_some())
+}
+
+/// Store the Claude API key in the Keychain, or remove it (`None` or empty).
+#[tauri::command]
+pub fn set_api_key(key: Option<String>) -> CmdResult<()> {
+    let entry = keychain()?;
+    match key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
+        Some(k) if !k.starts_with("sk-ant-") => Err("non sembra una chiave API di Anthropic (inizia con sk-ant-)".into()),
+        Some(k) => entry.set_password(&k).map_err(|e| format!("impossibile salvare la chiave: {e}")),
+        None => match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(format!("impossibile rimuovere la chiave: {e}")),
+        },
+    }
+}
+
+/// Claude reads the suspicious measures of a recognised PDF again (engine `omr.refine`),
+/// plus `extra_measures` picked by the user. Returns the `RefineResult` schema.
+#[tauri::command]
+pub async fn omr_refine(
+    state: State<'_, AppState>,
+    pdf_path: String,
+    musicxml: String,
+    extra_measures: Vec<u32>,
+) -> CmdResult<serde_json::Value> {
+    let key = stored_api_key()?.ok_or("manca la chiave API di Claude")?;
+    let client = state.omr.clone();
+    let params = serde_json::json!({
+        "pdfPath": pdf_path, "musicxml": musicxml, "extraMeasures": extra_measures, "apiKey": key,
+    });
+    // A careful reading of a few measures can take a few minutes.
+    tauri::async_runtime::spawn_blocking(move || client.request("omr.refine", params, Duration::from_secs(900)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Correct one note of a recognised score (see engine `score.edit`).
 #[tauri::command]
 pub async fn score_edit(

@@ -154,6 +154,20 @@ class OmrResult(_Model):
     warnings: list[OmrWarning]
 
 
+class KeptMeasure(_Model):
+    measure: int = Field(ge=1)
+    reason: str
+
+
+class RefineResult(_Model):
+    """Result of ``omr.refine``: the score after Claude's second reading."""
+
+    musicxml: str
+    warnings: list[OmrWarning]
+    changed: list[int] = Field(description="Measures rewritten from Claude's reading")
+    kept: list[KeptMeasure] = Field(description="Measures sent but left as they were, and why")
+
+
 class OmrProgress(_Model):
     """Payload of the ``omr.progress`` notification."""
 
@@ -229,4 +243,5 @@ EXPORTED_MODELS: dict[str, type[BaseModel]] = {
     "TranscribeResult": TranscribeResult,
     "TranscribeProgress": TranscribeProgress,
     "TranscribeHints": TranscribeHints,
+    "RefineResult": RefineResult,
 }

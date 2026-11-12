@@ -12,6 +12,7 @@ dependencies = [
     "pypdfium2>=4",
     "soundfile>=0.12",
     "scipy>=1.11",
+    "anthropic>=1",
 ]
 
 [dependency-groups]

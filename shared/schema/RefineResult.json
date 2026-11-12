@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "KeptMeasure": {
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "measure",
+        "reason"
+      ],
+      "title": "KeptMeasure",
+      "type": "object"
+    },
+    "OmrWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "staff": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "duration",
+            "page"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "measure",
+        "kind",
+        "message"
+      ],
+      "title": "OmrWarning",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of ``omr.refine``: the score after Claude's second reading.",
+  "properties": {
+    "musicxml": {
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/OmrWarning"
+      },
+      "type": "array"
+    },
+    "changed": {
+      "description": "Measures rewritten from Claude's reading",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "kept": {
+      "description": "Measures sent but left as they were, and why",
+      "items": {
+        "$ref": "#/$defs/KeptMeasure"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "musicxml",
+    "warnings",
+    "changed",
+    "kept"
+  ],
+  "title": "RefineResult",
+  "type": "object"
+}

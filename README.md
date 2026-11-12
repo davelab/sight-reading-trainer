@@ -114,6 +114,24 @@ tempo, altezza), mai per ID. Il controllo automatico segnala solo le battute
 la cui durata non torna con il tempo in chiave: le altezze sbagliate (come i
 diesis persi) vanno viste confrontando con il PDF.
 
+### Rilettura con Claude (OMR, facoltativa)
+
+Nella correzione di un PDF, **«Migliora con Claude»** fa rileggere a Claude le
+battute sospette: quelle che non tornano, quelle che mescolano terzine e valori
+normali nella stessa voce (tipico delle terzine a cavallo dei due pentagrammi),
+più la battuta della nota selezionata. Claude riceve le immagini delle pagine e
+la nostra lettura, e risponde nota per nota (pentagramma, voce, attacco, durata,
+altezza). Una battuta viene riscritta solo se ogni voce la riempie esattamente;
+altrimenti resta com'era e la barra dice perché. «Annulla» (⌘Z) torna indietro.
+
+- Serve una chiave API di Anthropic (console.anthropic.com, a consumo): alla
+  prima richiesta l'app la chiede e la salva nel Portachiavi di macOS.
+- Le immagini delle pagine vengono inviate ad Anthropic; senza rete, o senza
+  chiave, l'OMR funziona come prima.
+- Dove: `engine/score_engine/omr/refine.py` (modello `claude-opus-5-5`, risposta in
+  JSON con schema, fallback lato server sui rifiuti), `commands.rs` (`omr_refine`,
+  Portachiavi), `components/ClaudeKey`, `stores/omr.ts`.
+
 ### Note cadenti (dopo l'MVP, su richiesta)
 
 | Fatto | Dove |

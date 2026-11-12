@@ -6,6 +6,7 @@ import {
   cancelImport,
   correct,
   finishReview,
+  refineWithClaude,
   savePerformanceMidi,
   saveRecognised,
   selectNote,
@@ -134,7 +135,8 @@ export function OmrProgress() {
 
 /** Correction toolbar and warnings, above the score while reviewing a recognised PDF. */
 export function OmrReviewBar() {
-  const { source, fileName, facts, midi, warnings, selected, history, busy, error } = useOmr()
+  const { source, fileName, facts, midi, warnings, selected, history, busy, error, pdfPath, refining, refineReport } =
+    useOmr()
   const labels = useScore((s) => s.measureLabels)
   const measureIds = useScore((s) => s.measureIds)
   const [showAll, setShowAll] = useState(false)
@@ -195,6 +197,15 @@ export function OmrReviewBar() {
           </span>
         )}
         <span className="omr-actions">
+          {source === 'pdf' && pdfPath && (
+            <button
+              disabled={busy || refining}
+              onClick={() => void refineWithClaude()}
+              title="Claude rilegge dal PDF le battute sospette e quella della nota selezionata. Richiede una chiave API (a pagamento) e invia ad Anthropic le immagini delle pagine."
+            >
+              {refining ? 'Claude sta rileggendo…' : 'Migliora con Claude'}
+            </button>
+          )}
           {midi && <button onClick={() => void savePerformanceMidi()}>Salva MIDI…</button>}
           <button onClick={() => void saveRecognised()}>Salva MusicXML…</button>
           <button className="primary" onClick={finishReview}>
@@ -202,6 +213,12 @@ export function OmrReviewBar() {
           </button>
         </span>
       </div>
+      {(refining || refineReport) && (
+        <div className="omr-row omr-claude" role="status">
+          {refining ? 'Claude sta rileggendo le battute sospette dal PDF: può volerci qualche minuto.' : refineReport}
+          {!refining && <button onClick={() => useOmr.setState({ refineReport: null })}>✕</button>}
+        </div>
+      )}
       <div className="omr-row">
         <span className="omr-selected">
           {selected

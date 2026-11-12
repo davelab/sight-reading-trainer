@@ -104,3 +104,12 @@ button.link {
   line-height: 1;
   font-family: 'Bravura Text', 'Noto Music', 'Apple Symbols', serif;
 }
+.omr-claude {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--chrome);
+  font-size: 13px;
+}
+.omr-claude button {
+  margin-left: auto;
+}
