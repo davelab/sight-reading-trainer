@@ -4,6 +4,19 @@
 # PyInstaller is GPL with the bootloader exception: fine for the bundled binary.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# rustup puts Rust on the PATH only for shells opened after installing it.
+if ! command -v rustc >/dev/null 2>&1 && [[ -f "$HOME/.cargo/env" ]]; then
+  # shellcheck disable=SC1091
+  source "$HOME/.cargo/env"
+fi
+for tool in rustc uv; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "error: '$tool' not found. Install it (see README, 'Installazione su Mac')," >&2
+    echo "       then open a new Terminal window and try again." >&2
+    exit 1
+  fi
+done
 TRIPLE="${TARGET_TRIPLE:-$(rustc -vV | sed -n 's/^host: //p')}"
 OUT="$ROOT/app/src-tauri/binaries"
 WORK="$ROOT/engine/build"
