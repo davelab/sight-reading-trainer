@@ -50,6 +50,40 @@ export function buildPlaybackEvents(
   return events
 }
 
+/** Ties in Verovio's MEI: end note id -> start note id (a chain links note by note). */
+export function tiesFromMei(mei: string): Map<string, string> {
+  const ties = new Map<string, string>()
+  for (const m of mei.matchAll(/<tie\b([^>]*)>/g)) {
+    const start = /\bstartid="#([^"]+)"/.exec(m[1])?.[1]
+    const end = /\bendid="#([^"]+)"/.exec(m[1])?.[1]
+    if (start && end) ties.set(end, start)
+  }
+  return ties
+}
+
+/**
+ * A tied note sounds once: each continuation (same pitch) is dropped and its
+ * time added to the note the tie starts from. Verovio's timemap lists the
+ * continuations as notes of their own, which would strike the key again.
+ */
+export function mergeTies(events: readonly PlaybackEvent[], ties: ReadonlyMap<string, string>): PlaybackEvent[] {
+  const out: PlaybackEvent[] = []
+  const sounding = new Map<string, PlaybackEvent>() // note id -> the event that sounds it
+  for (const e of [...events].sort((a, b) => a.onsetMs - b.onsetMs || a.pitch - b.pitch)) {
+    const startId = ties.get(e.noteId)
+    const head = startId !== undefined ? sounding.get(startId) : undefined
+    if (head && head.pitch === e.pitch) {
+      head.durMs = Math.max(head.durMs, e.onsetMs + e.durMs - head.onsetMs)
+      sounding.set(e.noteId, head)
+      continue
+    }
+    const copy = { ...e }
+    out.push(copy)
+    sounding.set(e.noteId, copy)
+  }
+  return out
+}
+
 /**
  * Map every note xml:id to its staff number by scanning Verovio's MEI output.
  * MEI <staff> elements never nest, so a flat tag scan is enough and avoids a DOM.

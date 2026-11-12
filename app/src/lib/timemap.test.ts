@@ -12,7 +12,9 @@ import {
   measureOnsets,
   measureStarts,
   scoreDurationMs,
-  staffMapFromMei
+  staffMapFromMei,
+  mergeTies,
+  tiesFromMei
 } from './timemap'
 
 const FIXTURE = fileURLToPath(new URL('../../../engine/tests/fixtures/minuet-in-g.musicxml', import.meta.url))
@@ -51,8 +53,18 @@ describe('assignMeasures', () => {
       { measureId: 'm1', index: 1, ms: 0 },
       { measureId: 'm2', index: 2, ms: 1500 }
     ]
-    const ev = (onsetMs: number) => ({ noteId: String(onsetMs), pitch: 60, onsetMs, durMs: 1, velocity: 80, staff: 1, measure: 0 })
-    expect(assignMeasures([ev(0), ev(1498), ev(1499.5), ev(3000)], measures).map((e) => e.measure)).toEqual([1, 1, 2, 2])
+    const ev = (onsetMs: number) => ({
+      noteId: String(onsetMs),
+      pitch: 60,
+      onsetMs,
+      durMs: 1,
+      velocity: 80,
+      staff: 1,
+      measure: 0
+    })
+    expect(assignMeasures([ev(0), ev(1498), ev(1499.5), ev(3000)], measures).map((e) => e.measure)).toEqual([
+      1, 1, 2, 2
+    ])
   })
 })
 
@@ -76,7 +88,8 @@ describe('measureOnsets', () => {
 
 describe('measureLabelsFromMei', () => {
   it('reads printed numbers in document order', () => {
-    const mei = '<section><measure xml:id="a" n="0"/><measure n="7" xml:id="b"><staff n="1"/></measure><measure xml:id="c"/></section>'
+    const mei =
+      '<section><measure xml:id="a" n="0"/><measure n="7" xml:id="b"><staff n="1"/></measure><measure xml:id="c"/></section>'
     expect(measureLabelsFromMei(mei)).toEqual(['0', '7', '3'])
     expect(measureIdsFromMei(mei)).toEqual(['a', 'b', 'c'])
   })
@@ -86,7 +99,11 @@ describe('staffMapFromMei', () => {
   it('assigns notes to the enclosing staff, chords included', () => {
     const mei = `<measure><staff xml:id="s1" n="1"><layer><note xml:id="n1"/><chord><note xml:id="n2"></note></chord></layer></staff>
       <staff n="2"><layer><note xml:id="n3" pname="g"/></layer></staff></measure>`
-    expect([...staffMapFromMei(mei)]).toEqual([['n1', 1], ['n2', 1], ['n3', 2]])
+    expect([...staffMapFromMei(mei)]).toEqual([
+      ['n1', 1],
+      ['n2', 1],
+      ['n3', 2]
+    ])
   })
 })
 
@@ -115,4 +132,45 @@ describe('Minuet in G fixture through Verovio', () => {
     // 32 bars of 3/4 at ♩ = 120 → 48 s.
     expect(scoreDurationMs(events)).toBe(48_000)
   }, 30_000)
+})
+
+describe('ties', () => {
+  const ev = (noteId: string, pitch: number, onsetMs: number, durMs: number) => ({
+    noteId,
+    pitch,
+    onsetMs,
+    durMs,
+    velocity: 80,
+    staff: 1,
+    measure: 1
+  })
+
+  it('reads ties from the MEI', () => {
+    const ties = tiesFromMei('<tie xml:id="t1" startid="#a" endid="#b" /><tie startid="#b" endid="#c"/>')
+    expect([...ties]).toEqual([
+      ['b', 'a'],
+      ['c', 'b']
+    ])
+  })
+
+  it('sounds a tied note once, for the whole tie (chains too)', () => {
+    const events = [ev('a', 69, 0, 1000), ev('b', 69, 1000, 500), ev('c', 69, 1500, 500), ev('d', 71, 2000, 500)]
+    const merged = mergeTies(
+      events,
+      new Map([
+        ['b', 'a'],
+        ['c', 'b']
+      ])
+    )
+    expect(merged.map((e) => [e.noteId, e.onsetMs, e.durMs])).toEqual([
+      ['a', 0, 2000],
+      ['d', 2000, 500]
+    ])
+    expect(events[0].durMs).toBe(1000) // the input is left as it was
+  })
+
+  it('keeps a "tie" between different pitches (a misread slur) as two notes', () => {
+    const merged = mergeTies([ev('a', 69, 0, 500), ev('b', 71, 500, 500)], new Map([['b', 'a']]))
+    expect(merged).toHaveLength(2)
+  })
 })

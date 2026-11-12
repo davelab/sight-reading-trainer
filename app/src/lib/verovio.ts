@@ -11,7 +11,9 @@ import {
   measureLabelsFromMei,
   measureOnsets,
   measureStarts,
+  mergeTies,
   staffMapFromMei,
+  tiesFromMei,
   type MeasureOnset,
   type MeasureStart,
   type PlaybackEvent
@@ -34,7 +36,10 @@ export interface RenderOptions {
 }
 
 export interface LoadedScore {
+  /** What is played: a tied note once, for its whole length. */
   events: PlaybackEvent[]
+  /** Every written note, tie continuations included (to find notes to correct). */
+  writtenEvents: PlaybackEvent[]
   measures: MeasureStart[]
   onsets: Map<string, MeasureOnset[]>
   /** Printed measure number by ordinal - 1. */
@@ -63,7 +68,13 @@ export async function loadScore(musicxml: string): Promise<LoadedScore> {
     return { pitch: midi.pitch, durMs: midi.duration, staff: staffs.get(id) ?? 1 }
   })
   const measures = measureStarts(timemap)
-  return { events: assignMeasures(events, measures), measures, onsets: measureOnsets(timemap), measureLabels: measureLabelsFromMei(mei),
+  const written = assignMeasures(events, measures)
+  return {
+    events: mergeTies(written, tiesFromMei(mei)),
+    writtenEvents: written,
+    measures,
+    onsets: measureOnsets(timemap),
+    measureLabels: measureLabelsFromMei(mei),
     measureIds: measureIdsFromMei(mei),
     meters: metersFromMei(mei),
     spellings: spellingsFromMei(mei)

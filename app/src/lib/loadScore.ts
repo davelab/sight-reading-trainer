@@ -50,7 +50,8 @@ export async function openMusicXml(
   { analyze = true, keepTransport = false }: OpenOptions = {}
 ): Promise<void> {
   const score = useScore.getState()
-  const { events, measures, onsets, measureLabels, measureIds, meters, spellings } = await loadScore(musicxml)
+  const { events, writtenEvents, measures, onsets, measureLabels, measureIds, meters, spellings } =
+    await loadScore(musicxml)
   score.set({
     fileName,
     title: title ?? titleFromXml(musicxml) ?? fileName,
@@ -62,7 +63,7 @@ export async function openMusicXml(
     measureIds,
     meters,
     spellings,
-    noteRefs: buildNoteRefs(onsets, measureIds, events),
+    noteRefs: buildNoteRefs(onsets, measureIds, writtenEvents),
     error: null
   })
   if (analyze)
