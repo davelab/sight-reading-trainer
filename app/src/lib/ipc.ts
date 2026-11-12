@@ -67,6 +67,9 @@ export const ipc = {
   setTempo: (percent: number) => invoke<void>('set_tempo', { percent }),
   setLoop: (loop: Loop | null) => invoke<void>('set_loop', { loop }),
   setHands: (hands: Hands) => invoke<void>('set_hands', { hands }),
+  setVolume: (volume: number) => invoke<void>('set_volume', { volume }),
+  setReverb: (amount: number) => invoke<void>('set_reverb', { amount }),
+  setTranspose: (semitones: number) => invoke<void>('set_transpose', { semitones }),
   /** Returns whether follow mode is now active. */
   setFollowMode: (enabled: boolean) => invoke<boolean>('set_follow_mode', { enabled }),
   midiListDevices: () => invoke<MidiDevices>('midi_list_devices'),

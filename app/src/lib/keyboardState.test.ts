@@ -34,6 +34,11 @@ describe('keyLights', () => {
     expect(keyLights(['g4a', 'g4b'], events).get(67)?.strikeId).toBe('g4b')
   })
 
+  it('lights the transposed keys', () => {
+    expect([...keyLights(['g3', 'd5'], events, undefined, 2).keys()].sort()).toEqual([57, 76])
+    expect([...keyLights(['g3', 'd5'], events, [76], 2).keys()]).toEqual([76])
+  })
+
   it('can be limited to the pitches still expected (follow mode)', () => {
     expect([...keyLights(['g3', 'd5'], events, [74]).keys()]).toEqual([74])
   })
