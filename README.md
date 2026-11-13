@@ -172,7 +172,9 @@ impostazione:
 | **Intervalli e accordi** | Un intervallo (2ª–8ª) o una triade maggiore/minore in qualsiasi rivolto: suoni tutte le note insieme; dopo vedi il nome («3ª minore», «Re maggiore, 1° rivolto») |
 | **Ritmo** | Due battute di ritmo in 5 livelli (fino a semicrome e terzine) al tempo scelto: conteggio, metronomo, batti su un tasto qualsiasi; ogni nota si colora (a tempo, anticipo/ritardo, mancata). Usa la modalità «A tempo» di Rust (qualsiasi tasto); poi la partitura torna nel trasporto |
 
-Codice: `lib/drills.ts` (generatori, verifica, statistiche), `components/Drills`.
+| **Solfeggio** | Frasi melodiche nuove a 6 livelli (dai gradi congiunti in Do maggiore con semiminime e minime fino a terzine, sincopi, salti d'ottava e minore armonica, con tonalità fino a 4 alterazioni), costruite con le cellule ritmiche classiche (ta, ti-ti, ta-a, ta-i ti, ti-ri-ti-ri, ti ti-ri, sincope, tim-ri, terzina, pause). Melodia con le regole di manuale: gradi congiunti, salto compensato da un grado congiunto in senso opposto, fine sulla tonica dal 2° o dal 7° grado. Sotto le note: sillabe ritmiche, nomi o niente. «Ascolta» la suona col metronomo; «Suona» la fa leggere al piano a tempo (note e ritmo, o solo ritmo) e colora ogni nota |
+
+Codice: `lib/drills.ts`, `lib/solfege.ts` (generatori, verifica, statistiche), `components/Drills`.
 
 ### Etichette degli accordi (impostazione)
 

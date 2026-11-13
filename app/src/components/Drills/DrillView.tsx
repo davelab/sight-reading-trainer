@@ -19,12 +19,13 @@ import {
 } from '../../lib/drills'
 import { inTauri, ipc, onMidiNote, onTimedNotes, onTimedSummary, type NoteJudgement } from '../../lib/ipc'
 import { restorePlayback } from '../../lib/loadScore'
-import { renderSnippet } from '../../lib/verovio'
 import { useMidi } from '../../stores/midi'
 import { TOLERANCE_MS, useView } from '../../stores/view'
+import { Snippet } from './Snippet'
+import { SolfegeDrill } from './SolfegeDrill'
 import './DrillView.css'
 
-type Tab = 'notes' | 'shapes' | 'rhythm'
+type Tab = 'notes' | 'shapes' | 'rhythm' | 'solfege'
 
 interface DrillSettings {
   tab: Tab
@@ -73,19 +74,6 @@ function saveJson(key: string, value: unknown): void {
   }
 }
 
-/** The SVG of a drill question, drawn by the drill's own Verovio toolkit. */
-function Snippet({ xml, className, scale = 110 }: { xml: string; className?: string; scale?: number }) {
-  const [svg, setSvg] = useState('')
-  useEffect(() => {
-    let live = true
-    void renderSnippet(xml, scale).then((s) => live && setSvg(s))
-    return () => {
-      live = false
-    }
-  }, [xml, scale])
-  return <div className={`drill-staff ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
-}
-
 /** Short daily drills: note reading, intervals and chords, rhythm. */
 export function DrillView() {
   const [settings, setSettings] = useState<DrillSettings>(() => loadJson(SETTINGS_KEY, DEFAULTS))
@@ -110,7 +98,8 @@ export function DrillView() {
           [
             ['notes', 'Lettura note'],
             ['shapes', 'Intervalli e accordi'],
-            ['rhythm', 'Ritmo']
+            ['rhythm', 'Ritmo'],
+            ['solfege', 'Solfeggio']
           ] as const
         ).map(([value, label]) => (
           <button
@@ -127,7 +116,9 @@ export function DrillView() {
       {!inTauri && (
         <p className="drill-note">Gli esercizi usano il piano MIDI o la tastiera a schermo: apri l'app desktop.</p>
       )}
-      {settings.tab === 'rhythm' ? (
+      {settings.tab === 'solfege' ? (
+        <SolfegeDrill />
+      ) : settings.tab === 'rhythm' ? (
         <RhythmDrill settings={settings} set={set} />
       ) : (
         <ReadingDrill key={settings.tab} settings={settings} set={set} shapes={settings.tab === 'shapes'} />
