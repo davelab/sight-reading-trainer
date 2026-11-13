@@ -89,9 +89,26 @@ const initial: Omit<OmrState, never> = {
 
 export const useOmr = create<OmrState>(() => ({ ...initial }))
 
+/** The correction in progress, to keep with its tab (null when not reviewing). */
+export function reviewSnapshot(): Partial<OmrState> | null {
+  const s = useOmr.getState()
+  if (s.phase !== 'review') return null
+  const { selectedId: _a, selected: _b, busy: _c, ...rest } = s
+  void _a
+  void _b
+  void _c
+  return { ...rest, selectedId: null, selected: null, busy: false }
+}
+
+/** Leave a correction (it stays with its tab); an import still running goes on. */
+export function resetReview(): void {
+  if (useOmr.getState().phase === 'review') useOmr.setState({ ...initial })
+}
+
 const baseName = (path: string) => path.split(/[\\/]/).pop() ?? path
 
 export async function startPdfImport(path: string): Promise<void> {
+  ;(await import('./documents')).snapshotActive(true)
   if (!inTauri) {
     useOmr.setState({ ...initial, phase: 'error', error: "L'import da PDF richiede l'app desktop" })
     return
@@ -107,6 +124,7 @@ export async function startPdfImport(path: string): Promise<void> {
 }
 
 export async function startAudioTranscription(path: string): Promise<void> {
+  ;(await import('./documents')).snapshotActive(true)
   if (!inTauri) {
     useOmr.setState({ ...initial, source: 'audio', phase: 'error', error: "La trascrizione richiede l'app desktop" })
     return

@@ -114,6 +114,16 @@ tempo, altezza), mai per ID. Il controllo automatico segnala solo le battute
 la cui durata non torna con il tempo in chiave: le altezze sbagliate (come i
 diesis persi) vanno viste confrontando con il PDF.
 
+### Più spartiti aperti (schede)
+
+Ogni spartito aperto (file, PDF importato, trascrizione, MIDI, idea registrata)
+è una scheda sotto la barra in alto; «+» apre un altro file, × chiude (il clic
+centrale anche), il pallino segna le modifiche non salvate. Cambiando scheda
+ognuno ritrova la sua analisi, la correzione OMR in corso, le proposte di Claude
+in Componi, la posizione, il tempo e le mani. Chiudendo uno spartito non salvato
+l'app chiede se salvarlo; alla chiusura della finestra avvisa se qualsiasi scheda
+ha modifiche non salvate. Codice: `stores/documents.ts`, `components/Tabs`.
+
 ### Esporta PDF
 
 File → **Esporta PDF…** (⌘P) per qualsiasi spartito aperto: MusicXML, PDF

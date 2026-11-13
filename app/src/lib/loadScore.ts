@@ -1,6 +1,5 @@
 import { inTauri, ipc } from './ipc'
 import { buildNoteRefs } from './noteRefs'
-import { offerToSave } from './saveScore'
 import { metronomeClicks } from './practice'
 import { scoreDurationMs } from './timemap'
 import { loadScore } from './verovio'
@@ -41,17 +40,32 @@ export interface OpenOptions {
   analyze?: boolean
   /** Keep tempo, loop and position (re-rendering after a correction). */
   keepTransport?: boolean
+  /** A tab coming back (stores/documents.ts): no new tab. */
+  restore?: boolean
 }
 
 export async function openMusicXml(
   fileName: string,
   musicxml: string,
   title: string | null,
-  { analyze = true, keepTransport = false }: OpenOptions = {}
+  { analyze = true, keepTransport = false, restore = false }: OpenOptions = {}
 ): Promise<void> {
   const score = useScore.getState()
-  const { events, writtenEvents, measures, onsets, measureLabels, measureIds, meters, spellings } =
-    await loadScore(musicxml)
+  const newTab = !keepTransport && !restore
+  const documents = await import('../stores/documents')
+  // The tab being left keeps its state (not a review: a new import brings its own).
+  if (newTab) {
+    documents.snapshotActive(false)
+    documents.beginOpen()
+  }
+  let loaded: Awaited<ReturnType<typeof loadScore>>
+  try {
+    loaded = await loadScore(musicxml)
+  } catch (e) {
+    if (newTab) documents.cancelOpen()
+    throw e
+  }
+  const { events, writtenEvents, measures, onsets, measureLabels, measureIds, meters, spellings } = loaded
   score.set({
     fileName,
     title: title ?? titleFromXml(musicxml) ?? fileName,
@@ -84,6 +98,7 @@ export async function openMusicXml(
   useMidi.getState().set({ following: false, expectedPitches: [], results: {}, timedResults: {}, timedSummary: null })
   if (!inTauri) {
     transport.set({ info: { durationMs: scoreDurationMs(events), synth: 'none', soundfontName: null } })
+    if (newTab) documents.addOpenedAsTab()
     return
   }
   const info = await ipc.playbackLoad(events)
@@ -94,6 +109,7 @@ export async function openMusicXml(
     sendClicks()
   ])
   transport.set({ info })
+  if (newTab) documents.addOpenedAsTab()
 }
 
 /**
@@ -135,7 +151,7 @@ async function withLoading(task: () => Promise<void>): Promise<void> {
 
 /** Open a file by path through the Rust core (Tauri only; handles .mxl and PDF import). */
 export async function openScorePath(path: string): Promise<void> {
-  await offerToSave()
+  // Another score opens in a tab of its own: the current one stays as it is.
   if (path.toLowerCase().endsWith('.pdf')) return startPdfImport(path)
   if (isAudioFile(path) || isMidiFile(path)) return startAudioTranscription(path)
   return withLoading(async () => {

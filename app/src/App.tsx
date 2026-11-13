@@ -4,6 +4,8 @@ import { AnalysisPanel } from './components/AnalysisPanel'
 import { ClaudeKeyDialog } from './components/ClaudeKey'
 import { ComposeView } from './components/Compose'
 import { DrillView } from './components/Drills'
+import { TabBar } from './components/Tabs'
+import { anyUnsaved } from './stores/documents'
 import { PdfExportDialog, usePdfDialog } from './components/PdfExport'
 import { Menu, type MenuEntry } from './components/Menu'
 import { TimedSummaryCard } from './components/Practice'
@@ -75,8 +77,8 @@ export default function App() {
   useEffect(() => {
     if (!inTauri) return
     const off = getCurrentWindow().onCloseRequested(async (event) => {
-      if (!useScore.getState().unsaved) return
-      const quit = await ask('Lo spartito corretto non è stato salvato. Chiudere comunque?', {
+      if (!anyUnsaved()) return
+      const quit = await ask('Ci sono spartiti con modifiche non salvate. Chiudere comunque?', {
         title: 'Modifiche non salvate',
         kind: 'warning',
         okLabel: 'Chiudi senza salvare',
@@ -247,6 +249,7 @@ export default function App() {
           </button>
         </div>
       </header>
+      {section !== 'drills' && <TabBar onOpen={() => openRef.current()} />}
       {error && (
         <div className="error" role="alert">
           {error}

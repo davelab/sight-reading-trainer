@@ -107,8 +107,11 @@ export async function discardIdea(): Promise<void> {
     })
     if (!yes) return
   }
-  await closeScore()
   useCompose.setState({ midi: null, advice: [], problems: [], preview: null, error: null })
+  const documents = await import('./documents')
+  const { activeId } = documents.useDocuments.getState()
+  if (activeId) await documents.closeTab(activeId, true)
+  else await closeScore()
 }
 
 /** Stop, and turn the recording into a score (it becomes the open score). */
