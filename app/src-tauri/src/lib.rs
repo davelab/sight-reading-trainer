@@ -3,6 +3,7 @@ mod engine;
 mod follow;
 mod midi;
 mod playback;
+mod record;
 mod score;
 mod synth;
 mod timed;
@@ -180,6 +181,8 @@ pub fn run() {
             commands::set_metronome,
             commands::start_timed_mode,
             commands::stop_timed_mode,
+            commands::record_start,
+            commands::record_stop,
             commands::virtual_note,
         ])
         .run(tauri::generate_context!())

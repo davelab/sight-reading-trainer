@@ -44,6 +44,8 @@ pub fn handle_live_note(app: &AppHandle, engine: &SharedEngine, note: NoteMessag
             if sound {
                 e.play_live(note.pitch, note.velocity, note.on);
             }
+            let now = e.now_ms();
+            e.recorder.note(note.pitch, note.velocity, note.on, now);
             if note.on {
                 let position = e.transport.position_ms();
                 e.timed.note_on(note.pitch, position);
@@ -58,6 +60,33 @@ pub fn handle_live_note(app: &AppHandle, engine: &SharedEngine, note: NoteMessag
     for r in results {
         let _ = app.emit("follow:result", r);
     }
+}
+
+/// The sustain pedal of the MIDI piano: recorded, and echoed to the UI (live chords).
+pub fn handle_pedal(app: &AppHandle, engine: &SharedEngine, down: bool) {
+    if let Ok(mut e) = engine.lock() {
+        let now = e.now_ms();
+        e.recorder.pedal(down, now);
+    }
+    let _ = app.emit("midi:pedal", down);
+}
+
+/// Start a live recording ("Componi"). Returns the milliseconds until the first
+/// downbeat (the count-in), 0 without metronome or count-in.
+#[tauri::command]
+pub fn record_start(
+    state: State<'_, AppState>,
+    bpm: Option<f64>,
+    beats_per_measure: u32,
+    count_in: bool,
+) -> CmdResult<f64> {
+    with_engine(&state, |e| e.start_recording(bpm, beats_per_measure, count_in))
+}
+
+/// Stop the live recording: its notes and pedal, in seconds from the first downbeat.
+#[tauri::command]
+pub fn record_stop(state: State<'_, AppState>) -> CmdResult<Option<crate::record::Recording>> {
+    with_engine(&state, |e| e.stop_recording())
 }
 
 #[tauri::command]
@@ -272,8 +301,13 @@ pub fn midi_select(app: AppHandle, state: State<'_, AppState>, name: Option<Stri
     *conn = None; // close the previous port first: some drivers allow one client per port
     if let Some(name) = name {
         let engine = state.engine.clone();
+        let (app2, engine2) = (app.clone(), engine.clone());
         // The piano makes its own sound: do not echo its notes through the synth.
-        *conn = Some(midi::connect(&name, move |note| handle_live_note(&app, &engine, note, false))?);
+        *conn = Some(midi::connect(
+            &name,
+            move |note| handle_live_note(&app, &engine, note, false),
+            move |down| handle_pedal(&app2, &engine2, down),
+        )?);
     }
     Ok(())
 }

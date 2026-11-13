@@ -1,8 +1,8 @@
 //! MIDI input with midir (CoreMIDI on macOS, ALSA on Linux).
 //!
 //! Web MIDI does not exist in WKWebView: every MIDI byte goes through Rust.
-//! Only note on/off matter for now; everything else (clock, active sensing,
-//! controllers, pedal) is ignored.
+//! Note on/off and the sustain pedal (CC 64) matter; everything else (clock,
+//! active sensing, other controllers) is ignored.
 
 use midir::{MidiInput, MidiInputConnection};
 use serde::Serialize;
@@ -30,6 +30,14 @@ pub fn parse(message: &[u8]) -> Option<NoteMessage> {
     }
 }
 
+/// Sustain pedal (controller 64) on any channel: Some(down) for a pedal message.
+pub fn parse_pedal(message: &[u8]) -> Option<bool> {
+    match message {
+        [status, 64, value] if status & 0xF0 == 0xB0 && *value <= 127 => Some(*value >= 64),
+        _ => None,
+    }
+}
+
 fn client() -> Result<MidiInput, String> {
     let mut input = MidiInput::new(CLIENT_NAME).map_err(|e| format!("MIDI non disponibile: {e}"))?;
     input.ignore(midir::Ignore::All); // SysEx, timing clock, active sensing
@@ -49,7 +57,11 @@ pub struct Connection {
 }
 
 /// Connect to the input port called `name`, calling `on_note` for every note message.
-pub fn connect(name: &str, mut on_note: impl FnMut(NoteMessage) + Send + 'static) -> Result<Connection, String> {
+pub fn connect(
+    name: &str,
+    mut on_note: impl FnMut(NoteMessage) + Send + 'static,
+    mut on_pedal: impl FnMut(bool) + Send + 'static,
+) -> Result<Connection, String> {
     let input = client()?;
     let port = input
         .ports()
@@ -63,6 +75,8 @@ pub fn connect(name: &str, mut on_note: impl FnMut(NoteMessage) + Send + 'static
             move |_stamp, message, _| {
                 if let Some(note) = parse(message) {
                     on_note(note);
+                } else if let Some(down) = parse_pedal(message) {
+                    on_pedal(down);
                 }
             },
             (),
@@ -74,6 +88,14 @@ pub fn connect(name: &str, mut on_note: impl FnMut(NoteMessage) + Send + 'static
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_the_sustain_pedal() {
+        assert_eq!(parse_pedal(&[0xB0, 64, 127]), Some(true));
+        assert_eq!(parse_pedal(&[0xB3, 64, 10]), Some(false));
+        assert_eq!(parse_pedal(&[0xB0, 7, 100]), None);
+        assert_eq!(parse(&[0xB0, 64, 127]), None);
+    }
 
     #[test]
     fn parses_note_on_off_on_any_channel() {

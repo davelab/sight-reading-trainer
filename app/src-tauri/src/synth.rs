@@ -18,6 +18,7 @@ use serde::Serialize;
 
 use crate::follow::Follow;
 use crate::playback::{MidiAction, Transport};
+use crate::record::{Recorder, Recording};
 use crate::timed::{Timed, TimedSummary};
 
 /// Frames rendered between two scheduler ticks (≈ 1.5 ms at 44.1 kHz).
@@ -179,6 +180,10 @@ pub struct Engine {
     pub timed: Timed,
     /// Hands the transport played before "A tempo" mode took them over.
     hands_before_timed: Option<crate::playback::Hands>,
+    pub recorder: Recorder,
+    /// Metronome of a live recording (no score: it runs on its own).
+    free_clicks: Option<FreeMetronome>,
+    clock: Instant,
     synth: Option<Box<dyn Synth>>,
     actions: Vec<MidiAction>,
     left: Vec<f32>,
@@ -192,6 +197,9 @@ impl Engine {
             follow: Follow::default(),
             timed: Timed::default(),
             hands_before_timed: None,
+            recorder: Recorder::default(),
+            free_clicks: None,
+            clock: Instant::now(),
             synth,
             actions: Vec::with_capacity(128),
             left: vec![0.0; BLOCK_FRAMES],
@@ -270,6 +278,56 @@ impl Engine {
         summary
     }
 
+    /// Milliseconds on the engine's clock (the time base of recordings).
+    pub fn now_ms(&self) -> f64 {
+        self.clock.elapsed().as_secs_f64() * 1000.0
+    }
+
+    /// Start recording. With `bpm` a metronome clicks (accent on each downbeat)
+    /// and, with `count_in`, one measure of clicks comes before the first
+    /// downbeat. Returns the milliseconds until that downbeat.
+    pub fn start_recording(&mut self, bpm: Option<f64>, beats_per_measure: u32, count_in: bool) -> f64 {
+        self.follow.stop();
+        self.stop_timed();
+        self.with_transport(|t, out| t.pause(out));
+        let beats = beats_per_measure.clamp(1, 12);
+        let bpm = bpm.filter(|b| b.is_finite() && (20.0..=300.0).contains(b));
+        let lead = match bpm {
+            Some(b) if count_in => f64::from(beats) * 60_000.0 / b,
+            _ => 0.0,
+        };
+        self.free_clicks =
+            bpm.map(|b| FreeMetronome { beat_ms: 60_000.0 / b, beats, elapsed_ms: 0.0, next: 0, sounding: None });
+        let origin = self.now_ms() + lead;
+        self.recorder.start(origin, bpm, beats);
+        lead
+    }
+
+    pub fn stop_recording(&mut self) -> Option<Recording> {
+        if let Some(m) = self.free_clicks.take() {
+            if let (Some(key), Some(synth)) = (m.sounding, self.synth.as_mut()) {
+                synth.apply(MidiAction::NoteOff { channel: crate::playback::CLICK_CHANNEL, key });
+            }
+        }
+        let now = self.now_ms();
+        self.recorder.stop(now)
+    }
+
+    fn tick_free_clicks(&mut self, real_ms: f64) {
+        let Some(m) = self.free_clicks.as_mut() else { return };
+        m.elapsed_ms += real_ms;
+        while m.elapsed_ms >= m.next as f64 * m.beat_ms {
+            let accent = m.next % u64::from(m.beats) == 0;
+            let key = if accent { 76 } else { 77 };
+            let channel = crate::playback::CLICK_CHANNEL;
+            if let Some(prev) = m.sounding.replace(key) {
+                self.actions.push(MidiAction::NoteOff { channel, key: prev });
+            }
+            self.actions.push(MidiAction::NoteOn { channel, key, velocity: 110 });
+            m.next += 1;
+        }
+    }
+
     /// Sound a note played live (on-screen keyboard), outside the transport.
     pub fn play_live(&mut self, key: u8, velocity: u8, on: bool) {
         if let Some(synth) = self.synth.as_mut() {
@@ -307,6 +365,7 @@ impl Engine {
             let frames = chunk.len() / channels;
             self.actions.clear();
             self.transport.advance(frames as f64 * block_ms, &mut self.actions);
+            self.tick_free_clicks(frames as f64 * block_ms);
             self.flush();
             let (l, r) = (&mut self.left[..frames], &mut self.right[..frames]);
             match self.synth.as_mut() {
@@ -323,6 +382,16 @@ impl Engine {
             }
         }
     }
+}
+
+/// Clicks of a live recording: beat length, beats per measure, time elapsed.
+#[derive(Debug, Clone, Copy)]
+struct FreeMetronome {
+    beat_ms: f64,
+    beats: u32,
+    elapsed_ms: f64,
+    next: u64,
+    sounding: Option<u8>,
 }
 
 pub type SharedEngine = Arc<Mutex<Engine>>;
@@ -463,6 +532,28 @@ mod tests {
         let (mut l, mut r) = (vec![0.0; 4410], vec![0.0; 4410]);
         s.render(&mut l, &mut r);
         assert!(l.iter().any(|x| x.abs() > 0.01));
+    }
+
+    #[test]
+    fn recording_metronome_counts_in_and_clicks_on_its_own() {
+        let mut e = Engine::new(None);
+        let lead = e.start_recording(Some(120.0), 3, true);
+        assert_eq!(lead, 1500.0, "one 3/4 measure at 120 bpm");
+        assert!(e.recorder.is_recording());
+        e.actions.clear();
+        e.tick_free_clicks(1600.0); // beats at 0, 500, 1000, 1500
+        let keys: Vec<u8> = e
+            .actions
+            .iter()
+            .filter_map(|a| match a {
+                MidiAction::NoteOn { key, .. } => Some(*key),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(keys, vec![76, 77, 77, 76], "accent on each downbeat");
+        let rec = e.stop_recording().expect("was recording");
+        assert_eq!((rec.bpm, rec.beats_per_measure), (Some(120.0), 3));
+        assert!(e.free_clicks.is_none());
     }
 
     #[test]
