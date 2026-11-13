@@ -20,6 +20,7 @@ import {
 import { inTauri, ipc, onMidiNote, onTimedNotes, onTimedSummary, type NoteJudgement } from '../../lib/ipc'
 import { restorePlayback } from '../../lib/loadScore'
 import { useMidi } from '../../stores/midi'
+import { useTransport } from '../../stores/transport'
 import { TOLERANCE_MS, useView } from '../../stores/view'
 import { Snippet } from './Snippet'
 import { SolfegeDrill } from './SolfegeDrill'
@@ -385,9 +386,12 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
   const [rhythm, setRhythm] = useState<RhythmNote[]>(() => nextRhythm(settings.level))
   const [verdicts, setVerdicts] = useState<Record<number, NoteJudgement>>({})
   const [running, setRunning] = useState(false)
+  const [listening, setListening] = useState(false)
+  const listeningRef = useRef(false)
   const [result, setResult] = useState<string | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const events = rhythmEvents(rhythm, settings.bpm)
+  const busy = running || listening
 
   // Colour the notes as they are judged (rendered notes in order = tapped notes).
   useEffect(() => {
@@ -419,24 +423,48 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
       useMidi.getState().set({ timedSummary: null })
       void restorePlayback()
     })
+    // «Ascolta» ends when the transport stops.
+    const offTransport = useTransport.subscribe((t, prev) => {
+      if (prev.playing && !t.playing && listeningRef.current) {
+        listeningRef.current = false
+        setListening(false)
+        void restorePlayback()
+      }
+    })
     return () => {
       void offNotes.then((fn) => fn())
       void offSummary.then((fn) => fn())
+      offTransport()
       // Leaving the drill mid-run: give the transport back to the score.
       if (useMidi.getState().timed) void ipc.stopTimedMode().then(() => restorePlayback())
+      else if (listeningRef.current) void ipc.pause().then(() => restorePlayback())
     }
   }, [])
 
-  const start = async () => {
-    setVerdicts({})
-    setResult(null)
-    setRunning(true)
-    const beatMs = 60000 / settings.bpm
+  /** The rhythm, its beats and the metronome into the transport, from the top. */
+  const loadRhythm = async () => {
     await ipc.playbackLoad(events)
     await Promise.all([ipc.setTempo(100), ipc.setHands('both'), ipc.setLoop(null)])
     await ipc.setClicks(rhythmClicks(settings.bpm))
     await ipc.setMetronome(true)
     await ipc.seek(0)
+  }
+
+  const listen = async () => {
+    setVerdicts({})
+    setResult(null)
+    setListening(true)
+    await loadRhythm()
+    listeningRef.current = true
+    await ipc.play()
+  }
+
+  const start = async () => {
+    setVerdicts({})
+    setResult(null)
+    setRunning(true)
+    await loadRhythm()
+    const beatMs = 60000 / settings.bpm
     await ipc.startTimedMode(TOLERANCE_MS[useView.getState().tolerance], { beats: 4, beatMs }, true)
   }
 
@@ -453,7 +481,7 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
           Livello
           <select
             value={settings.level}
-            disabled={running}
+            disabled={busy}
             onChange={(e) => {
               set({ level: Number(e.target.value) })
               newRhythm(Number(e.target.value))
@@ -474,16 +502,21 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
             max={160}
             step={5}
             value={settings.bpm}
-            disabled={running}
+            disabled={busy}
             onChange={(e) => set({ bpm: Math.min(160, Math.max(40, Number(e.target.value) || 70)) })}
           />
           ♩/min
         </label>
-        <button disabled={running} onClick={() => newRhythm()}>
+        <button disabled={busy} onClick={() => newRhythm()}>
           Nuovo ritmo
+        </button>
+        <button disabled={busy || !inTauri} onClick={() => void listen()} title="Il ritmo suonato, col metronomo">
+          ▶ Ascolta
         </button>
         {running ? (
           <button onClick={() => void ipc.stopTimedMode()}>Ferma</button>
+        ) : listening ? (
+          <button onClick={() => void ipc.pause()}>■ Ferma</button>
         ) : (
           <button className="primary" disabled={!inTauri} onClick={() => void start()}>
             {result ? 'Riprova' : 'Inizia'}
@@ -495,7 +528,9 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
         <div className="drill-feedback">
           {running
             ? 'Una battuta di conteggio, poi batti il ritmo su un tasto qualsiasi'
-            : (result ?? 'Leggi il ritmo, poi premi Inizia')}
+            : listening
+              ? 'Ascolta…'
+              : (result ?? 'Leggi il ritmo (o ascoltalo), poi premi Inizia')}
         </div>
         <div className="drill-legend">
           {Object.entries(VERDICT_TEXT).map(([k, label]) => (
