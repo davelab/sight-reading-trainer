@@ -114,6 +114,21 @@ tempo, altezza), mai per ID. Il controllo automatico segnala solo le battute
 la cui durata non torna con il tempo in chiave: le altezze sbagliate (come i
 diesis persi) vanno viste confrontando con il PDF.
 
+### Tre sezioni: Studia, Esercizi, Componi
+
+In alto, accanto a File: **Studia** (lo spartito: partitura, note cadenti,
+analisi, Segui / A tempo, import da PDF/audio/MIDI), **Esercizi** (lettura note,
+intervalli e accordi, ritmo), **Componi**.
+
+### Componi
+
+| Fatto | Dove |
+|---|---|
+| **Registra** dal piano MIDI (o dalla tastiera a schermo): note e pedale con i tempi presi nel thread MIDI di Rust; metronomo facoltativo (2/4, 3/4, 4/4) con una battuta di conteggio; le note suonate durante il conteggio diventano anacrusi | `src-tauri/src/record.rs`, `synth.rs` (metronomo libero), `commands.rs` |
+| **In tempo reale**: l'accordo sotto le mani (anche inversioni, settime, sospesi; col pedale), la tonalità delle ultime battute (Krumhansl, con memoria che sfuma), il tempo; una striscia degli ultimi accordi | `lib/live.ts` |
+| **Allo stop diventa spartito**: col metronomo le battute sono esatte (la griglia è il metronomo), senza metronomo il battito si ricava come nella trascrizione; «Salva MIDI…» salva l'esecuzione | `engine/score_engine/compose.py` (`compose.transcribe`) |
+| **Sviluppa con Claude**: scrivi cosa vorresti (facoltativo) e scegli «Solo idee» o 1–8 battute; Claude legge le ultime 16 battute con tonalità e metro e risponde con consigli in italiano e le battute successive, che appaiono in viola: Ascolta, Tieni, Scarta, Un'altra. Una battuta entra solo se ogni voce la riempie esattamente | `compose.py` (`compose.continue`), `ai.py`, `components/Compose` |
+
 ### Lettura a prima vista
 
 | Fatto | Dove |

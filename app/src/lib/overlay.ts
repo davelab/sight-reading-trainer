@@ -93,9 +93,10 @@ const WARN = 'omr-warning'
 export function markWarnings(
   root: ParentNode,
   warnings: readonly { measure: number; staff?: number | null }[],
-  measureIds: readonly string[]
+  measureIds: readonly string[],
+  cls = WARN
 ): void {
-  root.querySelectorAll(`.${WARN}`).forEach((el) => el.remove())
+  root.querySelectorAll(`.${cls}`).forEach((el) => el.remove())
   for (const w of warnings) {
     const id = measureIds[w.measure - 1]
     const measure = id ? root.querySelector<SVGGElement>(`g.measure[id="${CSS.escape(id)}"]`) : null
@@ -108,7 +109,7 @@ export function markWarnings(
     const x = Math.min(...boxes.map((b) => b.x))
     const y = Math.min(...boxes.map((b) => b.y))
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
-    rect.setAttribute('class', WARN)
+    rect.setAttribute('class', cls)
     rect.setAttribute('x', String(x))
     rect.setAttribute('y', String(y))
     rect.setAttribute('width', String(Math.max(...boxes.map((b) => b.x + b.width)) - x))

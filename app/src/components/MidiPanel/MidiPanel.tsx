@@ -8,7 +8,7 @@ import './MidiPanel.css'
 const POLL_MS = 3000
 
 /** MIDI input selection and the follow-mode switch with its running score. */
-export function MidiPanel() {
+export function MidiPanel({ practice = true }: { practice?: boolean }) {
   const { devices, selected, error, following, results, timed, countingIn, timedResults, set } = useMidi()
   const hasScore = useScore((s) => s.events.length > 0)
 
@@ -66,31 +66,35 @@ export function MidiPanel() {
           </option>
         ))}
       </select>
-      <button
-        className={following ? 'follow on' : 'follow'}
-        disabled={!inTauri || !hasScore}
-        onClick={() => void toggleFollow()}
-        title="Il cursore avanza solo quando suoni le note giuste"
-      >
-        Segui
-      </button>
-      <button
-        className={timed ? 'follow on' : 'follow'}
-        disabled={!inTauri || !hasScore}
-        onClick={() => void (timed ? stopTimed() : startTimed())}
-        title="La musica va avanti al tempo scelto anche se sbagli, come leggendo a prima vista: ogni nota è giudicata giusta, in anticipo, in ritardo o mancata. La mano che non suoni la suona l'app."
-      >
-        {timed ? 'Ferma' : 'A tempo'}
-      </button>
-      {timed && (
-        <span className="follow-summary">
-          {countingIn ? 'Conto…' : `${live.ok} a tempo · ${live.off} fuori tempo · ${live.bad} errori`}
-        </span>
-      )}
-      {!timed && summary.accuracy !== null && (
-        <span className="follow-summary" title={`${summary.measures} battute`}>
-          {summary.correct} giuste · {summary.wrong} sbagliate · {Math.round(summary.accuracy * 100)}%
-        </span>
+      {practice && (
+        <>
+          <button
+            className={following ? 'follow on' : 'follow'}
+            disabled={!inTauri || !hasScore}
+            onClick={() => void toggleFollow()}
+            title="Il cursore avanza solo quando suoni le note giuste"
+          >
+            Segui
+          </button>
+          <button
+            className={timed ? 'follow on' : 'follow'}
+            disabled={!inTauri || !hasScore}
+            onClick={() => void (timed ? stopTimed() : startTimed())}
+            title="La musica va avanti al tempo scelto anche se sbagli, come leggendo a prima vista: ogni nota è giudicata giusta, in anticipo, in ritardo o mancata. La mano che non suoni la suona l'app."
+          >
+            {timed ? 'Ferma' : 'A tempo'}
+          </button>
+          {timed && (
+            <span className="follow-summary">
+              {countingIn ? 'Conto…' : `${live.ok} a tempo · ${live.off} fuori tempo · ${live.bad} errori`}
+            </span>
+          )}
+          {!timed && summary.accuracy !== null && (
+            <span className="follow-summary" title={`${summary.measures} battute`}>
+              {summary.correct} giuste · {summary.wrong} sbagliate · {Math.round(summary.accuracy * 100)}%
+            </span>
+          )}
+        </>
       )}
     </div>
   )

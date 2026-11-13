@@ -4,8 +4,13 @@ import { create } from 'zustand'
  * How the score is shown and heard, remembered between sessions
  * (localStorage, per this computer only).
  */
+export type Section = 'study' | 'drills' | 'compose'
+
 export interface ViewSettings {
-  mode: 'score' | 'falling' | 'both' | 'drills'
+  /** The three parts of the app: study a score, drills, compose. */
+  section: Section
+  /** How a score is shown in «Studia». */
+  mode: 'score' | 'falling' | 'both'
   showChords: boolean
   showNoteNames: boolean
   showKeyNames: boolean
@@ -43,6 +48,7 @@ export interface ViewSettings {
 export const TOLERANCE_MS = { strict: 80, normal: 130, loose: 200 } as const
 
 export const DEFAULT_VIEW: ViewSettings = {
+  section: 'study',
   mode: 'score',
   showChords: true,
   showNoteNames: false,
@@ -73,7 +79,10 @@ const STORAGE_KEY = 'view-settings'
 function load(): ViewSettings {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
-    return { ...DEFAULT_VIEW, ...(typeof saved === 'object' && saved ? saved : {}) }
+    const merged = { ...DEFAULT_VIEW, ...(typeof saved === 'object' && saved ? saved : {}) }
+    // Drills were a view mode before they became a section.
+    if ((merged.mode as string) === 'drills') return { ...merged, mode: 'score', section: 'drills' }
+    return merged
   } catch {
     return { ...DEFAULT_VIEW }
   }

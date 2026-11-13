@@ -183,6 +183,8 @@ pub fn run() {
             commands::stop_timed_mode,
             commands::record_start,
             commands::record_stop,
+            commands::compose_transcribe,
+            commands::compose_continue,
             commands::virtual_note,
         ])
         .run(tauri::generate_context!())

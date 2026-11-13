@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { AnalysisPanel } from './components/AnalysisPanel'
 import { ClaudeKeyDialog } from './components/ClaudeKey'
+import { ComposeView } from './components/Compose'
 import { DrillView } from './components/Drills'
 import { Menu, type MenuEntry } from './components/Menu'
 import { TimedSummaryCard } from './components/Practice'
@@ -38,6 +39,7 @@ export default function App() {
   useOmrEvents()
   useViewSync()
   const mode = useView((s) => s.mode)
+  const section = useView((s) => s.section)
   const setView = useView((s) => s.set)
   const reviewing = useOmr((s) => s.phase === 'review')
   const dropping = useFileDrop()
@@ -182,23 +184,44 @@ export default function App() {
             e.target.value = ''
           }}
         />
-        <MidiPanel />
-        <div className="toolbar-group segmented" role="group" aria-label="Vista">
+        <div className="toolbar-group segmented sections" role="tablist" aria-label="Sezione">
           {(
             [
-              ['score', 'Partitura'],
-              ['falling', 'Note cadenti'],
-              ['both', 'Entrambe'],
-              ['drills', 'Esercizi']
+              ['study', 'Studia', 'Leggi, ascolta e suona uno spartito; importa PDF e registrazioni'],
+              ['drills', 'Esercizi', 'Esercizi brevi di lettura: note, intervalli e accordi, ritmo'],
+              ['compose', 'Componi', 'Registra un\u2019idea dal piano, vedila scritta e sviluppala con Claude']
             ] as const
-          ).map(([value, label]) => (
-            <button key={value} className={mode === value ? 'selected' : ''} onClick={() => setView({ mode: value })}>
+          ).map(([value, label, hint]) => (
+            <button
+              key={value}
+              role="tab"
+              aria-selected={section === value}
+              className={section === value ? 'selected' : ''}
+              title={hint}
+              onClick={() => setView({ section: value })}
+            >
               {label}
             </button>
           ))}
         </div>
+        <MidiPanel practice={section === 'study'} />
+        {section === 'study' && (
+          <div className="toolbar-group segmented" role="group" aria-label="Vista">
+            {(
+              [
+                ['score', 'Partitura'],
+                ['falling', 'Note cadenti'],
+                ['both', 'Entrambe']
+              ] as const
+            ).map(([value, label]) => (
+              <button key={value} className={mode === value ? 'selected' : ''} onClick={() => setView({ mode: value })}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <h1 className="title">{loading ? 'Caricamento…' : (title ?? 'Score Studio')}</h1>
-        <div className="toolbar-group">
+        <div className="toolbar-group" hidden={section === 'drills'}>
           <button disabled={!hasScore || zoom <= ZOOM_MIN} onClick={() => set({ zoom: zoom - 5 })} title="Riduci">
             −
           </button>
@@ -217,9 +240,11 @@ export default function App() {
           <button onClick={() => set({ error: null })}>✕</button>
         </div>
       )}
-      {reviewing ? <OmrReviewBar /> : mode !== 'drills' && <AnalysisPanel />}
-      {!reviewing && mode === 'drills' ? (
+      {reviewing ? <OmrReviewBar /> : section === 'study' && <AnalysisPanel />}
+      {!reviewing && section === 'drills' ? (
         <DrillView />
+      ) : !reviewing && section === 'compose' ? (
+        <ComposeView />
       ) : (
         <main className={`main view-${reviewing ? 'score' : mode}`}>
           {reviewing && <OmrPages />}
@@ -232,7 +257,7 @@ export default function App() {
         </main>
       )}
       <OmrProgress />
-      {mode !== 'drills' && <TimedSummaryCard />}
+      {section === 'study' && <TimedSummaryCard />}
       <TranscribeSetup />
       <ClaudeKeyDialog />
       <Keyboard />

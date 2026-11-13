@@ -4,6 +4,7 @@ import { drawAnalysis, systemSpacingFor } from '../../lib/analysisOverlay'
 import { followCursor, highlightNotes, markMeasures, markSelected, markWarnings } from '../../lib/overlay'
 import { clearLookahead, drawAids, drawLookahead } from '../../lib/practiceOverlay'
 import { useView } from '../../stores/view'
+import { useCompose } from '../../stores/compose'
 import { clearPatterns, drawPatterns } from '../../lib/patterns'
 import { renderPages, timeForNote } from '../../lib/verovio'
 import { useAnalysis } from '../../stores/analysis'
@@ -32,6 +33,7 @@ export function ScoreView() {
   const aidIntervals = useView((s) => s.aidIntervals)
   const aidChordShapes = useView((s) => s.aidChordShapes)
   const spellings = useScore((s) => s.spellings)
+  const proposal = useCompose((s) => s.preview)
   const measures = useScore((s) => s.measures)
   const onsets = useScore((s) => s.onsets)
   const analysis = useAnalysis((s) => s.analysis)
@@ -143,6 +145,14 @@ export function ScoreView() {
     })
     markMeasures(el, [...follow, ...timedMarks])
   }, [results, timedResults, measures, pages])
+
+  // «Componi»: Claude's new measures in violet until kept or dropped.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const marks = proposal ? Array.from({ length: proposal.added }, (_, i) => ({ measure: proposal.first + i })) : []
+    markWarnings(el, marks, measureIds, 'compose-new')
+  }, [proposal, measureIds, pages])
 
   // Look-ahead: cover the measure being played (and the next) while the music goes.
   useEffect(() => {

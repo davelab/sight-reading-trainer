@@ -452,6 +452,46 @@ pub async fn omr_refine(
         .map_err(|e| e.to_string())?
 }
 
+/// A live recording as a score (engine `compose.transcribe`, in the omr sidecar
+/// that also transcribes audio). `recording` is what `record_stop` returned.
+#[tauri::command]
+pub async fn compose_transcribe(
+    state: State<'_, AppState>,
+    recording: serde_json::Value,
+    title: Option<String>,
+    hints: Option<serde_json::Value>,
+) -> CmdResult<serde_json::Value> {
+    let client = state.omr.clone();
+    let params = serde_json::json!({
+        "notes": recording.get("notes"),
+        "pedals": recording.get("pedals"),
+        "bpm": recording.get("bpm"),
+        "beatsPerMeasure": recording.get("beatsPerMeasure"),
+        "title": title,
+        "hints": hints,
+    });
+    tauri::async_runtime::spawn_blocking(move || client.request("compose.transcribe", params, Duration::from_secs(180)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Claude's advice on the piece and, with `measures` > 0, the next measures
+/// (engine `compose.continue`). Needs the API key in the Keychain.
+#[tauri::command]
+pub async fn compose_continue(
+    state: State<'_, AppState>,
+    musicxml: String,
+    measures: u32,
+    request: String,
+) -> CmdResult<serde_json::Value> {
+    let key = stored_api_key()?.ok_or("manca la chiave API di Claude")?;
+    let client = state.omr.clone();
+    let params = serde_json::json!({ "musicxml": musicxml, "measures": measures, "request": request, "apiKey": key });
+    tauri::async_runtime::spawn_blocking(move || client.request("compose.continue", params, Duration::from_secs(900)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Correct one note of a recognised score (see engine `score.edit`).
 #[tauri::command]
 pub async fn score_edit(

@@ -1,0 +1,156 @@
+.compose {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--paper-bg);
+}
+.compose-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.compose-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.compose-bar input[type='number'] {
+  width: 56px;
+}
+.rec {
+  font-weight: 700;
+  color: var(--err);
+}
+.rec.on {
+  background: var(--err);
+  border-color: var(--err);
+  color: white;
+}
+.compose-clock {
+  min-width: 70px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.compose-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 28px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.live-chord {
+  min-width: 140px;
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.live-facts {
+  display: flex;
+  gap: 24px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.live-facts span {
+  display: flex;
+  flex-direction: column;
+}
+.live-facts small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+.live-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+.live-strip span {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.live-strip .current {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+.compose-work {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 12px;
+}
+.compose-score {
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.compose-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.compose-ai h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.compose-ai textarea {
+  resize: vertical;
+  font: inherit;
+}
+.compose-ai-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.compose-ai .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.compose-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgb(142 91 214 / 0.12);
+}
+.compose-advice {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.compose-note,
+.compose-help {
+  color: var(--text-secondary);
+}
+.compose-help {
+  max-width: 640px;
+  margin: 24px auto;
+  font-size: 15px;
+  line-height: 1.5;
+}
+@media (max-width: 900px) {
+  .compose-work {
+    grid-template-columns: 1fr;
+  }
+}

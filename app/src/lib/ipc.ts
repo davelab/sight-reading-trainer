@@ -12,6 +12,8 @@ import type {
   OmrProgress,
   OmrResult,
   RefineResult,
+  ComposeScore,
+  Continuation,
   TranscribeHints,
   TranscribeProgress,
   TranscribeResult
@@ -78,6 +80,15 @@ export interface TimedSummary {
   measures: number
 }
 
+/** A live recording from src-tauri/src/record.rs (seconds from the first downbeat). */
+export interface Recording {
+  notes: { onset: number; offset: number; pitch: number; velocity: number }[]
+  pedals: { onset: number; offset: number }[]
+  duration: number
+  bpm: number | null
+  beatsPerMeasure: number
+}
+
 export interface MeasureResult {
   measure: number
   correct: number
@@ -134,6 +145,14 @@ export const ipc = {
   startTimedMode: (toleranceMs: number, countIn: { beats: number; beatMs: number } | null, anyKey = false) =>
     invoke<void>('start_timed_mode', { toleranceMs, countIn, anyKey }),
   stopTimedMode: () => invoke<void>('stop_timed_mode'),
+  /** Live recording ("Componi"): ms until the first downbeat (count-in). */
+  recordStart: (bpm: number | null, beatsPerMeasure: number, countIn: boolean) =>
+    invoke<number>('record_start', { bpm, beatsPerMeasure, countIn }),
+  recordStop: () => invoke<Recording | null>('record_stop'),
+  composeTranscribe: (recording: Recording, title: string) =>
+    invoke<ComposeScore>('compose_transcribe', { recording, title, hints: null }),
+  composeContinue: (musicxml: string, measures: number, request: string) =>
+    invoke<Continuation>('compose_continue', { musicxml, measures, request }),
   /** Start transcribing a piano recording; progress and result arrive as transcribe:* events. */
   transcribeAudio: (path: string, hints: TranscribeHints = {}) =>
     invoke<{ jobId: string }>('transcribe_audio', { path, hints }),
@@ -192,6 +211,10 @@ export function onTranscribeFailed(cb: (f: OmrFailed) => void): Promise<Unlisten
 
 export function onPlaybackPosition(cb: (p: PlaybackPosition) => void): Promise<UnlistenFn> {
   return listen<PlaybackPosition>('playback:position', (e) => cb(e.payload))
+}
+
+export function onMidiPedal(cb: (down: boolean) => void): Promise<UnlistenFn> {
+  return listen<boolean>('midi:pedal', (e) => cb(e.payload))
 }
 
 export function onMidiNote(cb: (n: MidiNote) => void): Promise<UnlistenFn> {

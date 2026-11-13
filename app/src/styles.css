@@ -166,3 +166,6 @@ button:disabled {
   border-color: var(--accent);
   color: white;
 }
+.toolbar .sections button {
+  font-weight: 600;
+}
