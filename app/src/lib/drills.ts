@@ -171,7 +171,7 @@ export function nextShape(o: ShapeOptions, previous: NoteQuestion | null, rnd: R
           : inversion === 1
             ? [third, fifth, up(root)]
             : [fifth, up(root), up(third)]
-      if (!o.accidentals && notes.some((n) => n.alter !== 0)) continue
+      if (!o.accidentals && notes.some((n) => n !== null && n.alter !== 0)) continue
       label = `${ITALIAN[root.step]}${{ [-1]: '♭', 0: '', 1: '♯' }[root.alter] ?? ''} ${quality.name}, ${INVERSIONS[inversion]}`
     }
     if (notes.some((n) => n === null)) continue
