@@ -4,6 +4,7 @@ import { AnalysisPanel } from './components/AnalysisPanel'
 import { ClaudeKeyDialog } from './components/ClaudeKey'
 import { ComposeView } from './components/Compose'
 import { DrillView } from './components/Drills'
+import { PdfExportDialog, usePdfDialog } from './components/PdfExport'
 import { Menu, type MenuEntry } from './components/Menu'
 import { TimedSummaryCard } from './components/Practice'
 import { FallingNotes } from './components/FallingNotes'
@@ -56,6 +57,10 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         void saveScore()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p' && useScore.getState().musicxml) {
+        e.preventDefault()
+        usePdfDialog.setState({ open: true })
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
         e.preventDefault()
@@ -149,6 +154,13 @@ export default function App() {
       highlight: unsaved,
       disabled: !hasScore,
       onSelect: () => void saveScore()
+    },
+    {
+      label: 'Esporta PDF…',
+      shortcut: '⌘P',
+      hint: 'Lo spartito in PDF, con o senza accordi e aiuti alla lettura',
+      disabled: !hasScore,
+      onSelect: () => usePdfDialog.setState({ open: true })
     },
     null,
     {
@@ -261,6 +273,7 @@ export default function App() {
       {section === 'study' && <TimedSummaryCard />}
       <TranscribeSetup />
       <ClaudeKeyDialog />
+      <PdfExportDialog />
       <Keyboard />
       <Transport />
       {dropping && <div className="drop-overlay">Rilascia per aprire</div>}

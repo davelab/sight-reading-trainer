@@ -39,8 +39,7 @@ export function getToolkit(): Promise<VerovioToolkit> {
  * toolkit: the score loaded in the main one is left alone.
  */
 export async function renderSnippet(musicxml: string, scale = 90, pageWidth = 1400): Promise<string> {
-  drillToolkitPromise ??= getModule().then((module) => new VerovioToolkit(module))
-  const tk = await drillToolkitPromise
+  const tk = await getAuxToolkit()
   tk.setOptions({
     scale,
     pageWidth,
@@ -88,6 +87,11 @@ export async function loadScore(musicxml: string): Promise<LoadedScore> {
   if (!tk.loadData(musicxml)) {
     throw new Error(`Verovio could not read the file: ${tk.getLog() || 'unknown error'}`)
   }
+  return describeLoaded(tk)
+}
+
+/** Notes, measures and spelling of the score loaded in `tk` (ids are that toolkit's). */
+export function describeLoaded(tk: VerovioToolkit): LoadedScore {
   tk.renderToMIDI() // required before getMIDIValuesForElement
   const timemap = tk.renderToTimemap({ includeMeasures: true })
   const mei = tk.getMEI()
@@ -109,6 +113,15 @@ export async function loadScore(musicxml: string): Promise<LoadedScore> {
     meters: metersFromMei(mei),
     spellings: spellingsFromMei(mei)
   }
+}
+
+/**
+ * A second toolkit for work that must not disturb the score on screen (drill
+ * snippets, PDF export): its own loaded data and layout.
+ */
+export function getAuxToolkit(): Promise<VerovioToolkit> {
+  drillToolkitPromise ??= getModule().then((module) => new VerovioToolkit(module))
+  return drillToolkitPromise
 }
 
 /** Lay the loaded score out at the given width and return one SVG string per page. */

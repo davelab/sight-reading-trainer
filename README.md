@@ -114,6 +114,19 @@ tempo, altezza), mai per ID. Il controllo automatico segnala solo le battute
 la cui durata non torna con il tempo in chiave: le altezze sbagliate (come i
 diesis persi) vanno viste confrontando con il PDF.
 
+### Esporta PDF
+
+File → **Esporta PDF…** (⌘P) per qualsiasi spartito aperto: MusicXML, PDF
+importato e corretto, trascrizione, idea registrata. La finestra mostra
+l'anteprima della prima pagina e permette di scegliere carta (A4 o Lettera),
+dimensione della musica, accordi (stile e colori) e aiuti alla lettura (nomi
+delle note, salti, forme degli accordi), con i preset «Solo spartito» e «Con
+tutti gli aiuti». Il PDF è generato nell'app: Verovio impagina su un secondo
+toolkit, le stesse sovrapposizioni dello schermo vengono disegnate sulle pagine e
+svg2pdf.js + jsPDF (MIT) scrivono il file; per ♯ ♭ ♩ ↑ ↓ è incorporato DejaVu
+Sans (licenza libera Bitstream Vera). Codice: `lib/pdfExport.ts`,
+`components/PdfExport`.
+
 ### Tre sezioni: Studia, Esercizi, Componi
 
 In alto, accanto a File: **Studia** (lo spartito: partitura, note cadenti,
