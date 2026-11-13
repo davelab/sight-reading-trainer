@@ -3,6 +3,7 @@ import {
   answer,
   beamsFor,
   midiOf,
+  nextArpeggio,
   nextNote,
   nextRhythm,
   nextShape,
@@ -11,6 +12,7 @@ import {
   questionXml,
   rhythmEvents,
   rhythmXml,
+  sequenceStep,
   sessionStats
 } from './drills'
 
@@ -147,5 +149,69 @@ describe('rhythm drill', () => {
       '<beam number="1">end</beam><beam number="2">end</beam>'
     ])
     expect(beamsFor([n(0, 1)])).toEqual([''])
+  })
+})
+
+describe('arpeggios', () => {
+  it('break a real chord in the order the pattern says', () => {
+    const rnd = seeded(21)
+    for (let i = 0; i < 150; i++) {
+      const q = nextArpeggio({ clef: i % 2 ? 'bass' : 'treble', kind: 'arpeggios', accidentals: true }, null, rnd)
+      expect(q.sequence).toBe(true)
+      const pitches = q.notes.map(midiOf)
+      const pcs = new Set(pitches.map((p) => p % 12))
+      const seventh = q.label.includes('settima')
+      expect(pcs.size).toBe(seventh ? 4 : 3)
+      if (q.label.includes('ascendente')) expect([...pitches].sort((a, b) => a - b)).toEqual(pitches)
+      if (q.label.includes('discendente')) expect([...pitches].sort((a, b) => b - a)).toEqual(pitches)
+      if (q.label.includes('albertino')) {
+        expect(pitches[1]).toBe(pitches[3]) // 1-5-3-5
+        expect(pitches[0]).toBeLessThan(pitches[2])
+      }
+      if (seventh) {
+        const root = pitches[q.label.includes('discendente') ? pitches.length - 1 : 0]
+        expect([...pcs].map((p) => (p - root + 120) % 12).sort((a, b) => a - b)).toEqual([0, 4, 7, 10])
+      }
+    }
+  })
+
+  it('stay on white keys without accidentals', () => {
+    const rnd = seeded(4)
+    for (let i = 0; i < 80; i++) {
+      const q = nextArpeggio({ clef: 'treble', kind: 'arpeggios', accidentals: false }, null, rnd)
+      expect(q.notes.every((n) => n.alter === 0)).toBe(true)
+      expect(q.label).not.toContain('settima')
+    }
+  })
+
+  it('are played one note after the other', () => {
+    const q = {
+      clef: 'treble' as const,
+      notes: [
+        { step: 0, alter: 0, octave: 4 },
+        { step: 2, alter: 0, octave: 4 },
+        { step: 4, alter: 0, octave: 4 }
+      ],
+      label: '',
+      sequence: true
+    }
+    expect(sequenceStep(60, q, 0)).toBe('next')
+    expect(sequenceStep(67, q, 1)).toBe('wrong')
+    expect(sequenceStep(64, q, 1)).toBe('next')
+    expect(sequenceStep(67, q, 2)).toBe('done')
+    const xml = questionXml(q)
+    expect(xml).toContain('<type>eighth</type>')
+    expect(xml).not.toContain('<chord/>')
+    expect(xml).toContain('<beam number="1">begin</beam>')
+  })
+
+  it('mix with intervals and triads in «Tutto»', () => {
+    const rnd = seeded(9)
+    const kinds = new Set<string>()
+    for (let i = 0; i < 60; i++) {
+      const q = nextShape({ clef: 'treble', kind: 'all', accidentals: false }, null, rnd)
+      kinds.add(q.sequence ? 'arpeggio' : q.notes.length === 2 ? 'interval' : 'triad')
+    }
+    expect(kinds).toEqual(new Set(['arpeggio', 'interval', 'triad']))
   })
 })

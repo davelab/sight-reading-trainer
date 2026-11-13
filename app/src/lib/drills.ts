@@ -77,6 +77,8 @@ function pick<T>(xs: readonly T[], rnd: Random): T {
 export interface NoteQuestion {
   clef: 'treble' | 'bass'
   notes: WrittenNote[]
+  /** Played one after the other, in this order (an arpeggio), not together. */
+  sequence?: boolean
   /** What the player sees after answering. */
   label: string
 }
@@ -105,7 +107,7 @@ export function nextNote(o: NoteDrillOptions, previous: NoteQuestion | null, rnd
 
 // --- Intervals and triads --------------------------------------------------------
 
-export type ShapeKind = 'intervals' | 'triads' | 'both'
+export type ShapeKind = 'intervals' | 'triads' | 'both' | 'arpeggios' | 'all'
 
 const INTERVAL_NAMES = ['', '', '2ª', '3ª', '4ª', '5ª', '6ª', '7ª', '8ª']
 /** Semitones of the major/perfect interval of each number. */
@@ -136,11 +138,77 @@ const TRIADS: { name: string; thirds: [number, number] }[] = [
 ]
 const INVERSIONS = ['stato fondamentale', '1° rivolto', '2° rivolto']
 
-/** An interval (two notes together) or a major/minor triad in any position. */
+const ARPEGGIO_PATTERNS = ['ascendente', 'discendente', 'su e giù', 'basso albertino'] as const
+
+const rootName = (n: WrittenNote) => `${ITALIAN[n.step]}${{ [-1]: '♭', 0: '', 1: '♯' }[n.alter] ?? ''}`
+
+/**
+ * A broken chord, to play note by note in the written order: a major or minor
+ * triad in any position (or, with accidentals, a dominant seventh), going up,
+ * down, up and down, or as an Alberti bass (1-5-3-5).
+ */
+export function nextArpeggio(o: ShapeOptions, previous: NoteQuestion | null, rnd: Random = Math.random): NoteQuestion {
+  const [lo, hi] = RANGES[o.clef].staff
+  for (let tries = 0; tries < 60; tries++) {
+    const root = fromDiatonic(lo + Math.floor(rnd() * (hi - lo - 3)))
+    if (o.accidentals && rnd() < 0.3) root.alter = rnd() < 0.5 ? -1 : 1
+    const seventh = o.accidentals && rnd() < 0.3
+    const quality = seventh ? TRIADS[0] : pick(TRIADS, rnd)
+    const third = above(root, 3, quality.thirds[0])
+    const fifth = above(root, 5, 7)
+    const sev = seventh ? above(root, 7, 10) : null
+    if (!third || !fifth || (seventh && !sev)) continue
+    const up = (n: WrittenNote) => ({ ...n, octave: n.octave + 1 })
+    let pattern: (typeof ARPEGGIO_PATTERNS)[number] = pick(ARPEGGIO_PATTERNS, rnd)
+    if (seventh && pattern === 'basso albertino') pattern = 'ascendente'
+    const inversion = seventh || pattern === 'basso albertino' ? 0 : Math.floor(rnd() * 3)
+    const block = seventh
+      ? [root, third, fifth, sev as WrittenNote]
+      : inversion === 0
+        ? [root, third, fifth]
+        : inversion === 1
+          ? [third, fifth, up(root)]
+          : [fifth, up(root), up(third)]
+    let notes: WrittenNote[]
+    if (pattern === 'basso albertino') notes = [root, fifth, third, fifth]
+    else if (seventh)
+      notes =
+        pattern === 'discendente'
+          ? [...block].reverse()
+          : pattern === 'su e giù'
+            ? [...block, block[2], block[1]]
+            : block
+    else {
+      const withOctave = [...block, up(block[0])]
+      notes =
+        pattern === 'ascendente'
+          ? withOctave
+          : pattern === 'discendente'
+            ? [...withOctave].reverse()
+            : [...block, block[1]]
+    }
+    if (!o.accidentals && notes.some((n) => n.alter !== 0)) continue
+    if (Math.max(...notes.map(diatonic)) > RANGES[o.clef].high) continue
+    const chord = seventh ? `${rootName(root)}7 (settima di dominante)` : `${rootName(root)} ${quality.name}`
+    const position = seventh || pattern === 'basso albertino' ? '' : `, ${INVERSIONS[inversion]}`
+    const label = `${chord}, ${pattern === 'basso albertino' ? 'basso albertino' : `arpeggio ${pattern}`}${position}`
+    if (previous && previous.label === label && midiOf(previous.notes[0]) === midiOf(notes[0])) continue
+    return { clef: o.clef, notes, label, sequence: true }
+  }
+  return {
+    clef: o.clef,
+    notes: [fromDiatonic(lo + 2), fromDiatonic(lo + 4), fromDiatonic(lo + 6)],
+    label: 'arpeggio',
+    sequence: true
+  }
+}
+
+/** An interval (two notes together), a major/minor triad in any position, or an arpeggio. */
 export function nextShape(o: ShapeOptions, previous: NoteQuestion | null, rnd: Random = Math.random): NoteQuestion {
+  if (o.kind === 'arpeggios' || (o.kind === 'all' && rnd() < 1 / 3)) return nextArpeggio(o, previous, rnd)
   const [lo, hi] = RANGES[o.clef].staff
   for (let tries = 0; tries < 50; tries++) {
-    const triad = o.kind === 'triads' || (o.kind === 'both' && rnd() < 0.5)
+    const triad = o.kind === 'triads' || ((o.kind === 'both' || o.kind === 'all') && rnd() < 0.5)
     const base = fromDiatonic(lo + Math.floor(rnd() * (hi - lo - 4)))
     if (o.accidentals && rnd() < 0.3) base.alter = rnd() < 0.5 ? -1 : 1
     let notes: (WrittenNote | null)[]
@@ -194,6 +262,16 @@ export function answer(held: readonly number[], q: NoteQuestion, anyOctave = fal
   const got = new Set(held.map(key))
   if ([...got].some((p) => !want.has(p))) return 'wrong'
   return [...want].every((p) => got.has(p)) ? 'right' : 'partial'
+}
+
+/**
+ * An arpeggio is played note by note: the key played against the note expected
+ * at `index`. "next" moves on, "done" was the last one, "wrong" stays there.
+ */
+export function sequenceStep(pitch: number, q: NoteQuestion, index: number): 'next' | 'done' | 'wrong' {
+  const expected = q.notes[index]
+  if (!expected || midiOf(expected) !== pitch) return 'wrong'
+  return index === q.notes.length - 1 ? 'done' : 'next'
 }
 
 // --- Session statistics ------------------------------------------------------------
@@ -422,6 +500,7 @@ function beamValue(k: number, n: number): string {
 /** A note or chord on its clef as MusicXML (a whole note, no time signature). */
 export function questionXml(q: NoteQuestion): string {
   const clef = q.clef === 'treble' ? '<sign>G</sign><line>2</line>' : '<sign>F</sign><line>4</line>'
+  if (q.sequence) return sequenceXml(q, clef)
   const notes = q.notes
     .map(
       (n, i) =>
@@ -431,6 +510,28 @@ export function questionXml(q: NoteQuestion): string {
     )
     .join('')
   return `<?xml version="1.0" encoding="UTF-8"?><score-partwise version="4.0"><part-list><score-part id="P1"><part-name></part-name></score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>1</divisions><key><fifths>0</fifths></key><time print-object="no"><beats>4</beats><beat-type>4</beat-type></time><clef>${clef}</clef></attributes>${notes}</measure></part></score-partwise>`
+}
+
+/** An arpeggio: eighth notes beamed by four, accidentals once per measure. */
+function sequenceXml(q: NoteQuestion, clef: string): string {
+  const shown = new Map<string, number>()
+  const notes = q.notes
+    .map((n, i) => {
+      const where = `${n.step}${n.octave}`
+      const sign =
+        (shown.get(where) ?? 0) !== n.alter
+          ? `<accidental>${{ [-1]: 'flat', 0: 'natural', 1: 'sharp' }[n.alter]}</accidental>`
+          : ''
+      shown.set(where, n.alter)
+      const k = i % 4
+      const last = i === q.notes.length - 1 || k === 3
+      const beam =
+        q.notes.length - (i - k) < 2 ? '' : `<beam number="1">${k === 0 ? 'begin' : last ? 'end' : 'continue'}</beam>`
+      return `<note><pitch>${pitchXml(n)}</pitch><duration>1</duration><voice>1</voice><type>eighth</type>${sign}${beam}</note>`
+    })
+    .join('')
+  const beats = Math.ceil(q.notes.length / 2)
+  return `<?xml version="1.0" encoding="UTF-8"?><score-partwise version="4.0"><part-list><score-part id="P1"><part-name></part-name></score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>2</divisions><key><fifths>0</fifths></key><time print-object="no"><beats>${beats}</beats><beat-type>4</beat-type></time><clef>${clef}</clef></attributes>${notes}</measure></part></score-partwise>`
 }
 
 /** Rhythm events for the Rust transport (silent; only the timing is judged). */

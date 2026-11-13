@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   answer,
+  sequenceStep,
   nextNote,
   nextRhythm,
   nextShape,
@@ -147,6 +148,10 @@ function ReadingDrill({
   const [finished, setFinished] = useState<{ elapsed: number; record: boolean } | null>(null)
   const held = useRef(new Set<number>())
   const attemptsRef = useRef<Attempt[]>([])
+  /** Arpeggios: how many notes have been played right so far. */
+  const progress = useRef(0)
+  const [played, setPlayed] = useState(0)
+  const stageRef = useRef<HTMLDivElement>(null)
   const timing = useRef({ session: 0, question: 0, errors: 0, ends: 0 })
   const current = useRef<NoteQuestion | null>(null)
   const recordKey = shapes
@@ -165,6 +170,8 @@ function ReadingDrill({
       current.current = q
       timing.current.question = performance.now()
       timing.current.errors = 0
+      progress.current = 0
+      setPlayed(0)
       setQuestion(q)
     },
     [shapes, settings]
@@ -216,10 +223,22 @@ function ReadingDrill({
       else held.current.delete(pitch)
       const q = current.current
       if (!on || !q) return
-      const result = answer([...held.current], q, !shapes && settings.anyOctave)
+      let result: 'right' | 'wrong' | 'partial'
+      if (q.sequence) {
+        // An arpeggio: one note after the other, in the written order.
+        const step = sequenceStep(pitch, q, progress.current)
+        if (step !== 'wrong') {
+          progress.current += 1
+          setPlayed(progress.current)
+        }
+        result = step === 'done' ? 'right' : step === 'wrong' ? 'wrong' : 'partial'
+        if (step === 'next') setFeedback(null)
+      } else {
+        result = answer([...held.current], q, !shapes && settings.anyOctave)
+      }
       if (result === 'wrong') {
         timing.current.errors += 1
-        setFeedback({ kind: 'wrong', text: 'No: riprova' })
+        setFeedback({ kind: 'wrong', text: q.sequence ? `No: la nota n° ${progress.current + 1}` : 'No: riprova' })
       } else if (result === 'right') {
         const ms = performance.now() - timing.current.question
         attemptsRef.current = [...attemptsRef.current, { label: q.label, ms, clean: timing.current.errors === 0 }]
@@ -234,6 +253,12 @@ function ReadingDrill({
     })
     return () => void off.then((fn) => fn())
   }, [ask, shapes, settings.anyOctave])
+
+  // Arpeggios: the notes already played turn green.
+  useEffect(() => {
+    const notes = [...(stageRef.current?.querySelectorAll('g.note') ?? [])]
+    notes.forEach((el, i) => el.classList.toggle('correct', !!question?.sequence && i < played))
+  })
 
   const stats = sessionStats(attempts, finished?.elapsed ?? performance.now() - timing.current.session)
   const best = records[recordKey]
@@ -263,7 +288,9 @@ function ReadingDrill({
               >
                 <option value="intervals">Intervalli</option>
                 <option value="triads">Triadi e rivolti</option>
-                <option value="both">Entrambi</option>
+                <option value="arpeggios">Arpeggi</option>
+                <option value="both">Intervalli e triadi</option>
+                <option value="all">Tutto</option>
               </select>
             </label>
             <label className="drill-check">
@@ -336,10 +363,15 @@ function ReadingDrill({
       </div>
 
       {running && question && (
-        <div className="drill-stage">
-          <Snippet xml={questionXml(question)} scale={shapes ? 120 : 130} />
+        <div className="drill-stage" ref={stageRef}>
+          <Snippet xml={questionXml(question)} className="rhythm" scale={shapes ? 120 : 130} />
           <div className={`drill-feedback ${feedback?.kind ?? ''}`}>
-            {feedback?.text ?? (shapes ? 'Suona tutte le note insieme' : 'Suona la nota')}
+            {feedback?.text ??
+              (question.sequence
+                ? `Suona le note una dopo l'altra (${played}/${question.notes.length})`
+                : shapes
+                  ? 'Suona tutte le note insieme'
+                  : 'Suona la nota')}
           </div>
           <div className="drill-live">
             {Math.ceil(remaining / 1000)} s · {attempts.length} {shapes ? 'riconosciuti' : 'note'}
@@ -369,7 +401,7 @@ function ReadingDrill({
       {!running && !finished && (
         <p className="drill-help">
           {shapes
-            ? 'Compare un intervallo o un accordo: suona tutte le sue note insieme. Così si impara a riconoscere la forma invece di leggere nota per nota.'
+            ? 'Compare un intervallo o un accordo: suona tutte le sue note insieme. Un arpeggio (crome legate) si suona invece nota per nota, nell\u2019ordine scritto: ascendente, discendente, su e giù o basso albertino. Così si impara a riconoscere la forma invece di leggere nota per nota.'
             : 'Compare una nota: suonala appena la riconosci. Conta la velocità: l’errore non si penalizza, ma la nota resta finché non trovi quella giusta.'}
           {best ? ` Record con queste impostazioni: ${Math.round(best)} al minuto.` : ''}
         </p>
