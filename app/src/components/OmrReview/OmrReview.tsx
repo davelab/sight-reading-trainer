@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { EditAction, NoteValue } from '../../lib/ipc'
+import { isTyping } from '../../lib/keys'
 import { pitchName } from '../../lib/noteRefs'
 import { revealMeasure } from '../../lib/overlay'
 import {
@@ -155,7 +156,7 @@ export function OmrReviewBar() {
   // C chord, ⌫ to rest, ⇧⌫ remove with its time, ⌘Z undo, Esc deselect.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
+      if (isTyping(e.target)) return
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         void undoCorrection()

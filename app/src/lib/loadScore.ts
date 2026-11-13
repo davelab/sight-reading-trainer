@@ -156,3 +156,29 @@ export function openScoreFile(file: File): Promise<void> {
     await openMusicXml(file.name, await file.text(), null)
   })
 }
+
+/** Close the open score: nothing loaded, nothing to play. */
+export async function closeScore(): Promise<void> {
+  useScore.getState().set({
+    fileName: null,
+    title: null,
+    musicxml: null,
+    events: [],
+    measures: [],
+    onsets: new Map(),
+    measureLabels: [],
+    measureIds: [],
+    meters: [],
+    spellings: new Map(),
+    noteRefs: new Map(),
+    unsaved: false,
+    error: null
+  })
+  useAnalysis.setState({ analysis: null, status: 'idle', error: null, selectedPattern: null })
+  useTransport.getState().set({ playing: false, positionMs: 0, currentNoteIds: [], loop: null, pendingLoopStart: null })
+  useMidi.getState().set({ following: false, expectedPitches: [], results: {}, timedResults: {}, timedSummary: null })
+  if (inTauri) {
+    await ipc.playbackLoad([])
+    await ipc.setClicks([])
+  }
+}

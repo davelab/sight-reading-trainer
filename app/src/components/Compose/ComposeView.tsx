@@ -3,6 +3,8 @@ import { inTauri, onMidiNote, onMidiPedal } from '../../lib/ipc'
 import { chordOf, KeyTracker, tempoOf, type LiveKey } from '../../lib/live'
 import {
   askClaude,
+  cancelRecording,
+  discardIdea,
   discardProposal,
   keepProposal,
   listenFrom,
@@ -94,9 +96,14 @@ export function ComposeView() {
     <div className="compose">
       <section className="compose-bar">
         {recording ? (
-          <button className="rec on" onClick={() => void stopRecording()}>
-            ■ Stop
-          </button>
+          <>
+            <button className="rec on" onClick={() => void stopRecording()} title="Ferma e scrivi lo spartito">
+              ■ Stop
+            </button>
+            <button onClick={() => void cancelRecording()} title="Ferma senza tenere niente, per ricominciare">
+              ✕ Annulla
+            </button>
+          </>
         ) : (
           <button
             className="rec"
@@ -155,6 +162,11 @@ export function ComposeView() {
           />
           Conteggio
         </label>
+        {hasScore && !recording && (
+          <button onClick={() => void discardIdea()} title="Cancella lo spartito di questa idea e ricomincia da capo">
+            Cancella idea
+          </button>
+        )}
         {c.midi && !recording && (
           <button onClick={() => void savePerformance()} title="L'esecuzione com'era, con il pedale">
             Salva MIDI…

@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { save } from '@tauri-apps/plugin-dialog'
 import { inTauri, ipc, type Recording } from '../lib/ipc'
-import { openMusicXml } from '../lib/loadScore'
+import { ask } from '@tauri-apps/plugin-dialog'
+import { closeScore, openMusicXml } from '../lib/loadScore'
 import { useOmr } from './omr'
 import { useScore } from './score'
 import { useTransport } from './transport'
@@ -86,6 +87,28 @@ export async function startRecording(): Promise<void> {
       if (useCompose.getState().phase === 'counting') useCompose.setState({ phase: 'recording' })
     }, lead)
   }
+}
+
+/** Stop without keeping anything (a false start). */
+export async function cancelRecording(): Promise<void> {
+  await ipc.recordStop()
+  useCompose.setState({ phase: 'idle', error: null })
+}
+
+/** Throw the idea away (after asking) to start again from an empty page. */
+export async function discardIdea(): Promise<void> {
+  const unsaved = useScore.getState().unsaved
+  if (unsaved && inTauri) {
+    const yes = await ask('Cancellare questa idea? Lo spartito non salvato andrà perso.', {
+      title: 'Cancella idea',
+      kind: 'warning',
+      okLabel: 'Cancella',
+      cancelLabel: 'Annulla'
+    })
+    if (!yes) return
+  }
+  await closeScore()
+  useCompose.setState({ midi: null, advice: [], problems: [], preview: null, error: null })
 }
 
 /** Stop, and turn the recording into a score (it becomes the open score). */

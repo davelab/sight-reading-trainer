@@ -19,6 +19,7 @@ import { useOmrEvents } from './hooks/useOmrEvents'
 import { usePlaybackPosition } from './hooks/usePlaybackPosition'
 import { useViewSync } from './hooks/useViewSync'
 import { inTauri, ipc } from './lib/ipc'
+import { isTyping } from './lib/keys'
 import { saveScore } from './lib/saveScore'
 import { ask } from '@tauri-apps/plugin-dialog'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -94,7 +95,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || !inTauri || !useScore.getState().events.length) return
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement) return
+      if (isTyping(e.target) || e.target instanceof HTMLButtonElement) return
       if (e.target instanceof HTMLSelectElement || useMidi.getState().following) return
       e.preventDefault()
       void (useTransport.getState().playing ? ipc.pause() : ipc.play())
