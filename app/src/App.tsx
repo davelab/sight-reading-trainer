@@ -3,6 +3,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { AnalysisPanel } from './components/AnalysisPanel'
 import { ClaudeKeyDialog } from './components/ClaudeKey'
 import { DrillView } from './components/Drills'
+import { Menu, type MenuEntry } from './components/Menu'
 import { TimedSummaryCard } from './components/Practice'
 import { FallingNotes } from './components/FallingNotes'
 import { Keyboard } from './components/Keyboard'
@@ -44,6 +45,7 @@ export default function App() {
   const { title, loading, error, zoom, layout, set } = useScore()
   const hasScore = useScore((s) => s.events.length > 0)
   const unsaved = useScore((s) => s.unsaved)
+  const openRef = useRef<() => void>(() => {})
 
   // ⌘S / Ctrl+S saves the open score as MusicXML.
   useEffect(() => {
@@ -51,6 +53,10 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         void saveScore()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
+        e.preventDefault()
+        openRef.current()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -111,6 +117,45 @@ export default function App() {
     if (typeof path === 'string') await openScorePath(path)
   }
 
+  openRef.current = () => void openDialog()
+
+  const pdfDialog = async () => {
+    const path = await open({ multiple: false, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+    if (typeof path === 'string') await openScorePath(path)
+  }
+
+  const fileMenu: MenuEntry[] = [
+    { label: 'Apri…', shortcut: '⌘O', hint: 'MusicXML, MXL, PDF o MIDI', onSelect: () => void openDialog() },
+    {
+      label: 'Importa da PDF…',
+      hint: 'Riconoscimento della partitura stampata (OMR), poi correzione',
+      disabled: !inTauri,
+      onSelect: () => void pdfDialog()
+    },
+    {
+      label: 'Trascrivi audio o MIDI…',
+      hint: 'Da una registrazione di pianoforte (MP3, WAV, M4A…) o da un file MIDI a partitura',
+      disabled: !inTauri,
+      onSelect: () => void transcribeDialog()
+    },
+    null,
+    {
+      label: 'Salva come MusicXML…',
+      shortcut: '⌘S',
+      hint: unsaved ? 'Modifiche non salvate' : undefined,
+      highlight: unsaved,
+      disabled: !hasScore,
+      onSelect: () => void saveScore()
+    },
+    null,
+    {
+      label: 'Chiave API di Claude…',
+      hint: 'Per «Migliora con Claude» nella correzione dei PDF: inserisci, cambia o rimuovi la chiave',
+      disabled: !inTauri,
+      onSelect: () => useOmr.setState({ keyDialog: true })
+    }
+  ]
+
   const transcribeDialog = async () => {
     const path = await open({
       multiple: false,
@@ -125,25 +170,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="toolbar">
-        <button onClick={() => void openDialog()}>Apri…</button>
-        <button
-          className={unsaved ? 'unsaved' : ''}
-          disabled={!hasScore}
-          onClick={() => void saveScore()}
-          title={
-            unsaved ? 'Modifiche non salvate: salva lo spartito in MusicXML (⌘S)' : 'Salva lo spartito in MusicXML (⌘S)'
-          }
-        >
-          {unsaved ? 'Salva… •' : 'Salva…'}
-        </button>
-        {inTauri && (
-          <button
-            onClick={() => void transcribeDialog()}
-            title="Da una registrazione di pianoforte (MP3, WAV, M4A…) o da un file MIDI a partitura"
-          >
-            Trascrivi audio/MIDI…
-          </button>
-        )}
+        <Menu label="File" items={fileMenu} badge={unsaved} />
         <input
           ref={fileInput}
           type="file"

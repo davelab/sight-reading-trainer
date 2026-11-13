@@ -178,7 +178,7 @@ export function ScoreView() {
       ) : (
         <div className="score-empty">
           <p className="score-empty-title">Trascina qui uno spartito</p>
-          <p>.musicxml, .xml, .mxl o un PDF da riconoscere — oppure usa «Apri…»</p>
+          <p>.musicxml, .mxl, un PDF, un MIDI o una registrazione — oppure usa File → Apri…</p>
         </div>
       )}
     </div>

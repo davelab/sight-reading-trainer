@@ -1,0 +1,72 @@
+.menu {
+  position: relative;
+}
+.menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.menu-button.open {
+  background: var(--paper-bg);
+}
+.menu-caret {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+.menu-badge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.18);
+}
+.menu-list button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  text-align: left;
+}
+.menu-list button:hover:not(:disabled),
+.menu-list button:focus-visible {
+  background: var(--accent);
+  color: white;
+  outline: none;
+}
+.menu-list button:hover:not(:disabled) kbd,
+.menu-list button:focus-visible kbd {
+  color: white;
+}
+.menu-list button.highlight span::after {
+  content: ' •';
+  color: var(--accent);
+}
+.menu-list kbd {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.menu-list hr {
+  width: 100%;
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}

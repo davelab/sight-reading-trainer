@@ -9,11 +9,13 @@ export function ClaudeKeyDialog() {
   const [key, setKey] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [stored, setStored] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setKey('')
     setError(null)
+    void ipc.apiKeyStatus().then(setStored, () => setStored(false))
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') useOmr.setState({ keyDialog: false })
     }
@@ -62,8 +64,20 @@ export function ClaudeKeyDialog() {
             onChange={(e) => setKey(e.target.value)}
           />
         </label>
+        {stored && <small>Una chiave è già salvata: incollane una nuova per sostituirla, oppure rimuovila.</small>}
         {error && <small className="omr-error">{error}</small>}
         <div className="tx-actions">
+          {stored && (
+            <button
+              type="button"
+              onClick={async () => {
+                await ipc.setApiKey(null)
+                close()
+              }}
+            >
+              Rimuovi chiave
+            </button>
+          )}
           <button type="button" onClick={close}>
             Annulla
           </button>
