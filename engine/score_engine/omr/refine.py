@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import base64
 import io
-import json
 import logging
 import re
 import xml.etree.ElementTree as ET
@@ -32,13 +31,13 @@ from math import lcm
 from pathlib import Path
 from typing import Any
 
+from ..ai import AIError, call_claude
 from ..io.correct import _serialize, check
 from ..io.xml_walk import MeasureInfo, WalkedNote, walk
 from .beams import add_beams
 
 log = logging.getLogger("score_engine.omr.refine")
 
-MODEL = "claude-opus-5-5"
 PAGE_DPI = 200  # the API scales large images down; this keeps noteheads legible
 MAX_PAGES = 8
 
@@ -115,8 +114,7 @@ SCHEMA: dict[str, Any] = {
 }
 
 
-class RefineError(RuntimeError):
-    pass
+RefineError = AIError
 
 
 @dataclass
@@ -211,8 +209,6 @@ def page_images(pdf: Path, pages: list[int]) -> list[str]:
 
 def ask_claude(api_key: str, images: list[str], measures: list[int], reading: str) -> dict:
     """One request: the pages, the measures to read, our reading; returns the parsed JSON."""
-    import anthropic
-
     content: list[dict[str, Any]] = []
     for i, data in enumerate(images, start=1):
         content.append({"type": "text", "text": f"Page {i}:"})
@@ -230,37 +226,7 @@ def ask_claude(api_key: str, images: list[str], measures: list[int], reading: st
             ),
         }
     )
-    client = anthropic.Anthropic(api_key=api_key, timeout=600.0)
-    try:
-        response = client.beta.messages.create(
-            model=MODEL,
-            max_tokens=32000,
-            system=SYSTEM,
-            messages=[{"role": "user", "content": content}],
-            output_config={"effort": "high", "format": {"type": "json_schema", "schema": SCHEMA}},
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-        )
-    except anthropic.AuthenticationError as e:
-        raise RefineError("chiave API di Claude non valida") from e
-    except anthropic.PermissionDeniedError as e:
-        raise RefineError("la chiave API non ha accesso a questo modello") from e
-    except anthropic.RateLimitError as e:
-        raise RefineError("troppe richieste a Claude: riprova tra un minuto") from e
-    except anthropic.APIConnectionError as e:
-        raise RefineError("Claude non raggiungibile: controlla la connessione") from e
-    except anthropic.APIStatusError as e:
-        raise RefineError(f"errore di Claude ({e.status_code}): {e.message}") from e
-    if response.stop_reason == "refusal":
-        raise RefineError("Claude ha rifiutato la richiesta")
-    if response.stop_reason == "max_tokens":
-        raise RefineError("risposta di Claude troppo lunga: prova con meno battute")
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    log.info("refine request %s: %s", response._request_id, response.usage)
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        raise RefineError("risposta di Claude non leggibile") from e
+    return call_claude(api_key, SYSTEM, content, SCHEMA, "refine")
 
 
 # --- Writing a measure ----------------------------------------------------------

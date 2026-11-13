@@ -168,6 +168,28 @@ class RefineResult(_Model):
     kept: list[KeptMeasure] = Field(description="Measures sent but left as they were, and why")
 
 
+class ComposeScore(_Model):
+    """Result of ``compose.transcribe``: a live recording as a score."""
+
+    musicxml: str
+    midi: str = Field(
+        description="The performance as played (with pedal), base64 Standard MIDI File"
+    )
+    facts: TranscribeFacts
+    warnings: list[OmrWarning]
+
+
+class Continuation(_Model):
+    """Result of ``compose.continue``: Claude's advice and the measures it added."""
+
+    musicxml: str
+    warnings: list[OmrWarning]
+    advice: list[str]
+    added: int = Field(ge=0)
+    first_new: int = Field(alias="firstNew", ge=1, description="Ordinal of the first new measure")
+    problems: list[str]
+
+
 class OmrProgress(_Model):
     """Payload of the ``omr.progress`` notification."""
 
@@ -244,4 +266,6 @@ EXPORTED_MODELS: dict[str, type[BaseModel]] = {
     "TranscribeProgress": TranscribeProgress,
     "TranscribeHints": TranscribeHints,
     "RefineResult": RefineResult,
+    "ComposeScore": ComposeScore,
+    "Continuation": Continuation,
 }

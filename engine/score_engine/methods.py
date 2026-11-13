@@ -14,12 +14,15 @@ from .io import musicxml as musicxml_io
 from .models import (
     Analysis,
     CheckResult,
+    ComposeScore,
+    Continuation,
     EditAction,
     KeptMeasure,
     NormalizeResult,
     NoteRef,
     PingResult,
     RefineResult,
+    TranscribeFacts,
 )
 from .rpc import INVALID_PARAMS, Dispatcher, RpcError
 
@@ -227,4 +230,60 @@ def omr_refine(params: dict[str, Any]) -> RefineResult:
         warnings=correct.check(out.musicxml),
         changed=out.changed,
         kept=[KeptMeasure(measure=m, reason=r) for m, r in out.kept],
+    )
+
+
+@dispatcher.method("compose.transcribe")
+def compose_transcribe(params: dict[str, Any]) -> ComposeScore:
+    """A live recording (notes and pedal in seconds from the first downbeat) as a score."""
+    from pydantic import ValidationError
+
+    from .compose import transcribe_recording
+    from .models import TranscribeHints
+
+    notes = params.get("notes")
+    if not isinstance(notes, list):
+        raise RpcError(INVALID_PARAMS, "notes must be a list")
+    bpm = params.get("bpm")
+    if bpm is not None and not (isinstance(bpm, int | float) and 20 <= bpm <= 300):
+        raise RpcError(INVALID_PARAMS, "bpm must be between 20 and 300")
+    try:
+        hints = TranscribeHints.model_validate(params.get("hints") or {})
+        xml, facts, midi = transcribe_recording(
+            notes,
+            params.get("pedals") or [],
+            float(bpm) if bpm else None,
+            int(params.get("beatsPerMeasure") or 4),
+            str(params.get("title") or "Improvvisazione"),
+            hints,
+        )
+    except (ValidationError, ValueError, KeyError, TypeError) as e:
+        raise RpcError(INVALID_PARAMS, f"registrazione non valida: {e}") from e
+    return ComposeScore(
+        musicxml=xml, midi=midi, facts=TranscribeFacts(**facts), warnings=correct.check(xml)
+    )
+
+
+@dispatcher.method("compose.continue")
+def compose_continue(params: dict[str, Any]) -> Continuation:
+    """Claude's advice on the piece and, with `measures` > 0, the next measures."""
+    from .ai import AIError
+    from .compose import continue_piece
+
+    musicxml = _require_str(params, "musicxml")
+    api_key = _require_str(params, "apiKey")
+    count = params.get("measures", 0)
+    if not isinstance(count, int) or not 0 <= count <= 8:
+        raise RpcError(INVALID_PARAMS, "measures must be between 0 and 8")
+    try:
+        out = continue_piece(musicxml, count, str(params.get("request") or ""), api_key)
+    except (AIError, ValueError) as e:
+        raise RpcError(INVALID_PARAMS, str(e)) from e
+    return Continuation(
+        musicxml=out.musicxml,
+        warnings=correct.check(out.musicxml),
+        advice=out.advice,
+        added=out.added,
+        firstNew=out.first_new,
+        problems=out.problems,
     )
