@@ -5,6 +5,7 @@ import {
   nextNote,
   nextRhythm,
   nextShape,
+  pickupChoices,
   questionXml,
   RHYTHM_LEVELS,
   rhythmClicks,
@@ -41,6 +42,8 @@ interface DrillSettings {
   shapeAccidentals: boolean
   level: number
   bpm: number
+  /** Rhythms in levare: never, now and then, always. */
+  pickupMode: 'never' | 'sometimes' | 'always'
 }
 
 const DEFAULTS: DrillSettings = {
@@ -54,7 +57,8 @@ const DEFAULTS: DrillSettings = {
   shapeKind: 'intervals',
   shapeAccidentals: false,
   level: 1,
-  bpm: 70
+  bpm: 70,
+  pickupMode: 'never'
 }
 const SETTINGS_KEY = 'drill-settings'
 const RECORDS_KEY = 'drill-records'
@@ -415,14 +419,21 @@ function ReadingDrill({
 const VERDICT_TEXT = { correct: 'a tempo', early: 'in anticipo', late: 'in ritardo', missed: 'mancata' } as const
 
 function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: Partial<DrillSettings>) => void }) {
-  const [rhythm, setRhythm] = useState<RhythmNote[]>(() => nextRhythm(settings.level))
+  const choosePickup = (level: number) => {
+    const mode = settings.pickupMode
+    if (mode === 'never' || (mode === 'sometimes' && Math.random() < 0.5)) return 0
+    const choices = pickupChoices(level)
+    return choices[Math.floor(Math.random() * choices.length)]
+  }
+  const [pickup, setPickup] = useState(() => choosePickup(settings.level))
+  const [rhythm, setRhythm] = useState<RhythmNote[]>(() => nextRhythm(settings.level, Math.random, pickup))
   const [verdicts, setVerdicts] = useState<Record<number, NoteJudgement>>({})
   const [running, setRunning] = useState(false)
   const [listening, setListening] = useState(false)
   const listeningRef = useRef(false)
   const [result, setResult] = useState<string | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const events = rhythmEvents(rhythm, settings.bpm)
+  const events = rhythmEvents(rhythm, settings.bpm, pickup)
   const busy = running || listening
 
   // Colour the notes as they are judged (rendered notes in order = tapped notes).
@@ -477,7 +488,7 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
   const loadRhythm = async () => {
     await ipc.playbackLoad(events)
     await Promise.all([ipc.setTempo(100), ipc.setHands('both'), ipc.setLoop(null)])
-    await ipc.setClicks(rhythmClicks(settings.bpm))
+    await ipc.setClicks(rhythmClicks(settings.bpm, pickup))
     await ipc.setMetronome(true)
     await ipc.seek(0)
   }
@@ -501,7 +512,9 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
   }
 
   const newRhythm = (level = settings.level) => {
-    setRhythm(nextRhythm(level))
+    const p = choosePickup(level)
+    setPickup(p)
+    setRhythm(nextRhythm(level, Math.random, p))
     setVerdicts({})
     setResult(null)
   }
@@ -539,6 +552,18 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
           />
           ♩/min
         </label>
+        <label title="Il ritmo comincia prima della prima stanghetta; l'ultima battuta è accorciata di altrettanto">
+          Levare
+          <select
+            value={settings.pickupMode}
+            disabled={busy}
+            onChange={(e) => set({ pickupMode: e.target.value as DrillSettings['pickupMode'] })}
+          >
+            <option value="never">Mai</option>
+            <option value="sometimes">A volte</option>
+            <option value="always">Sempre</option>
+          </select>
+        </label>
         <button disabled={busy} onClick={() => newRhythm()}>
           Nuovo ritmo
         </button>
@@ -556,10 +581,12 @@ function RhythmDrill({ settings, set }: { settings: DrillSettings; set: (patch: 
         )}
       </div>
       <div className="drill-stage" ref={stageRef}>
-        <Snippet xml={rhythmXml(rhythm)} className="rhythm" scale={90} />
+        <Snippet xml={rhythmXml(rhythm, pickup)} className="rhythm" scale={90} />
         <div className="drill-feedback">
           {running
-            ? 'Una battuta di conteggio, poi batti il ritmo su un tasto qualsiasi'
+            ? pickup
+              ? 'Una battuta di conteggio, poi entra in levare: batti il ritmo su un tasto qualsiasi'
+              : 'Una battuta di conteggio, poi batti il ritmo su un tasto qualsiasi'
             : listening
               ? 'Ascolta…'
               : (result ?? 'Leggi il ritmo (o ascoltalo), poi premi Inizia')}

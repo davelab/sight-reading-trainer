@@ -383,14 +383,54 @@ const BEAT_CELLS: { level: number; cell: [number, boolean][]; triplet?: boolean 
   }
 ]
 
-/** Two measures of 4/4 at `level` (0-4): never starting with a rest, never empty. */
-export function nextRhythm(level: number, rnd: Random = Math.random): RhythmNote[] {
+/** Bar lines: [start, end) of each measure in quarters; a pickup measure first, the last one shortened by it. */
+export function barsOf(total: number, meter: number, pickup = 0): [number, number][] {
+  const bars: [number, number][] = []
+  if (pickup > 0) bars.push([0, pickup])
+  for (let t = pickup; t < total - 1e-9; t += meter) bars.push([t, Math.min(t + meter, total)])
+  return bars
+}
+
+/** How long a pickup may be at a level (quarters): a beat, two, or an eighth. */
+export function pickupChoices(level: number, meter = 4): number[] {
+  const out = [1]
+  if (level >= 1) out.push(0.5)
+  if (level >= 2 && meter >= 3) out.push(2)
+  return out
+}
+
+/**
+ * Two measures of 4/4 at `level` (0-4): never starting with a rest, never empty.
+ * With a `pickup` (quarters) the rhythm starts in levare and, as in written
+ * music, the last measure is shortened by the same amount.
+ */
+export function nextRhythm(level: number, rnd: Random = Math.random, pickup = 0): RhythmNote[] {
   const out: RhythmNote[] = []
+  const total = 8
   let t = 0
-  while (t < 8) {
+  const cells = BEAT_CELLS.filter((c) => c.level <= level)
+  const beatCell = (start: number) => {
+    const c = pick(cells, rnd)
+    let at = start
+    for (const [length, rest] of c.cell) {
+      out.push({ start: at, length, rest: rest && start > 0, triplet: !!c.triplet })
+      at += length
+    }
+  }
+  // The pickup: an eighth, or whole beats (never a rest on its first note).
+  if (pickup === 0.5) out.push({ start: 0, length: 0.5, rest: false, triplet: false })
+  else for (let b = 0; b < pickup; b++) beatCell(b)
+  t = pickup
+  while (t < total - 1e-9) {
+    const barStart = pickup + Math.floor((t - pickup) / 4 + 1e-9) * 4
+    const left = Math.min(barStart + 4, total) - t
+    if (left < 1 - 1e-9) {
+      out.push({ start: t, length: left, rest: false, triplet: false })
+      t += left
+      continue
+    }
     // Half notes (and dotted quarter + eighth) span two beats, within a measure.
-    const inMeasure = t % 4
-    if (inMeasure <= 2 && rnd() < 0.18) {
+    if (left >= 2 - 1e-9 && rnd() < 0.18) {
       if (level >= 2 && rnd() < 0.5) {
         out.push(
           { start: t, length: 1.5, rest: false, triplet: false },
@@ -402,20 +442,14 @@ export function nextRhythm(level: number, rnd: Random = Math.random): RhythmNote
       t += 2
       continue
     }
-    const cells = BEAT_CELLS.filter((c) => c.level <= level)
-    const c = pick(cells, rnd)
-    let at = t
-    for (const [length, rest] of c.cell) {
-      out.push({ start: at, length, rest: rest && t > 0, triplet: !!c.triplet })
-      at += length
-    }
+    beatCell(t)
     t += 1
   }
   return out
 }
 
 /** The rhythm as MusicXML on one line (percussion clef), for Verovio. */
-export function rhythmXml(rhythm: readonly RhythmNote[]): string {
+export function rhythmXml(rhythm: readonly RhythmNote[], pickup = 0): string {
   const div = 12
   const types: Record<string, [string, number]> = {
     '4': ['whole', 0],
@@ -428,9 +462,13 @@ export function rhythmXml(rhythm: readonly RhythmNote[]): string {
     '0.25': ['16th', 0]
   }
   const measures: string[] = []
-  for (let m = 0; m < 2; m++) {
-    const notes = rhythm.filter((n) => n.start >= m * 4 - 1e-9 && n.start < m * 4 + 4 - 1e-9)
-    const beams = beamsFor(notes)
+  const bars = barsOf(8, 4, pickup)
+  for (let m = 0; m < bars.length; m++) {
+    const [from, to] = bars[m]
+    const notes = rhythm.filter((n) => n.start >= from - 1e-9 && n.start < to - 1e-9)
+    // Beams by beat: the pickup measure's notes sit at the end of a full bar.
+    const offset = m === 0 && pickup > 0 ? 4 - pickup : 0
+    const beams = beamsFor(notes.map((n) => ({ ...n, start: n.start - from + offset })))
     const body = notes
       .map((n, i) => {
         const dur = Math.round(n.length * div)
@@ -457,7 +495,10 @@ export function rhythmXml(rhythm: readonly RhythmNote[]): string {
       m === 0
         ? `<attributes><divisions>${div}</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>percussion</sign></clef><staff-details><staff-lines>1</staff-lines></staff-details></attributes>`
         : ''
-    measures.push(`<measure number="${m + 1}">${attrs}${body}</measure>`)
+    const number = pickup > 0 ? m : m + 1
+    measures.push(
+      `<measure number="${number}"${pickup > 0 && m === 0 ? ' implicit="yes"' : ''}>${attrs}${body}</measure>`
+    )
   }
   return `<?xml version="1.0" encoding="UTF-8"?><score-partwise version="4.0"><part-list><score-part id="P1"><part-name></part-name></score-part></part-list><part id="P1">${measures.join('')}</part></score-partwise>`
 }
@@ -535,23 +576,30 @@ function sequenceXml(q: NoteQuestion, clef: string): string {
 }
 
 /** Rhythm events for the Rust transport (silent; only the timing is judged). */
-export function rhythmEvents(rhythm: readonly RhythmNote[], bpm: number) {
+/** Silent beats before a pickup, so that its first note falls on the right beat after the count-in. */
+export function pickupLead(pickup: number, meter = 4): number {
+  return pickup > 0 ? meter - pickup : 0
+}
+
+export function rhythmEvents(rhythm: readonly RhythmNote[], bpm: number, pickup = 0) {
   const q = 60000 / bpm
+  const lead = pickupLead(pickup)
   return rhythm
     .filter((n) => !n.rest)
     .map((n, i) => ({
       noteId: `rhythm-${i}`,
       pitch: 72,
-      onsetMs: n.start * q,
+      onsetMs: (n.start + lead) * q,
       durMs: n.length * q * 0.9,
       velocity: 80,
       staff: 1,
-      measure: Math.floor(n.start / 4) + 1
+      measure: n.start < pickup ? 0 : Math.floor((n.start - pickup) / 4) + 1
     }))
 }
 
-/** One click per beat for the two measures, accent on each downbeat. */
-export function rhythmClicks(bpm: number) {
+/** One click per beat, accent on each downbeat (a pickup starts in the bar before the first). */
+export function rhythmClicks(bpm: number, pickup = 0) {
   const q = 60000 / bpm
-  return Array.from({ length: 8 }, (_, i) => ({ ms: i * q, accent: i % 4 === 0 }))
+  const beats = Math.ceil(8 + pickupLead(pickup))
+  return Array.from({ length: beats }, (_, i) => ({ ms: i * q, accent: i % 4 === 0 }))
 }

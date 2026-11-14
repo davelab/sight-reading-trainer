@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { barsOf } from './drills'
 import { bounds, makeKey, midiOf, nextPhrase, phraseEvents, phraseXml, signatureAlter, SOLFEGE_LEVELS } from './solfege'
 
 function seeded(seed: number) {
@@ -25,19 +26,22 @@ describe('phrases', () => {
     SOLFEGE_LEVELS.forEach((level, index) => {
       const rnd = seeded(index * 31 + 7)
       for (let i = 0; i < 60; i++) {
-        const p = nextPhrase(index, rnd)
+        const p = nextPhrase(index, rnd, i % 2 ? 'always' : 'never')
         const total = p.notes.reduce((s, n) => s + n.length, 0)
         expect(total).toBeCloseTo(level.measures * p.meter)
         // No note crosses a bar line.
+        const bars = barsOf(total, p.meter, p.pickup)
         for (const n of p.notes) {
-          expect(Math.floor(n.start / p.meter + 1e-9)).toBe(Math.floor((n.start + n.length - 1e-6) / p.meter))
+          const bar = bars.find(([a, b]) => n.start >= a - 1e-9 && n.start < b - 1e-9)!
+          expect(n.start + n.length).toBeLessThanOrEqual(bar[1] + 1e-9)
         }
         const sounding = p.notes.filter((n) => !n.rest)
         expect(sounding[sounding.length - 1].degree).toBe(p.key.tonic)
         expect(p.notes[0].rest).toBe(false)
         const [lo, hi] = bounds(level, p.key)
         for (const n of sounding.slice(0, -2)) {
-          expect(n.degree).toBeGreaterThanOrEqual(lo)
+          // The leading tone may lead into the tonic from just below the range (Si -> Do).
+          expect(n.degree).toBeGreaterThanOrEqual(lo - (n.start < p.pickup ? 1 : 0))
           expect(n.degree).toBeLessThanOrEqual(hi)
         }
       }
@@ -93,5 +97,34 @@ describe('phrases', () => {
     const events = phraseEvents(p, 60)
     expect(events[0].onsetMs).toBe(0)
     expect(events.length).toBe(p.notes.filter((n) => !n.rest).length)
+  })
+})
+
+describe('phrases in levare', () => {
+  it('lead to the tonic on the first downbeat, the last measure shortened', () => {
+    const rnd = seeded(77)
+    for (let i = 0; i < 80; i++) {
+      const p = nextPhrase(i % 6, rnd, 'always')
+      expect([1, 2]).toContain(p.pickup)
+      const total = p.notes.reduce((x, n) => x + n.length, 0)
+      const bars = barsOf(total, p.meter, p.pickup)
+      expect(bars[0]).toEqual([0, p.pickup])
+      expect(bars[bars.length - 1][1] - bars[bars.length - 1][0]).toBeCloseTo(p.meter - p.pickup)
+      // The pickup moves by step into the downbeat's approach note.
+      const pick = p.notes.filter((n) => n.start < p.pickup - 1e-9 && !n.rest)
+      for (let k = 1; k < pick.length; k++) expect(Math.abs(pick[k].degree - pick[k - 1].degree)).toBe(1)
+      const downbeat = p.notes.find((n) => n.start >= p.pickup - 1e-9)!
+      expect(downbeat.rest).toBe(false)
+      expect(downbeat.degree).toBe(p.key.tonic)
+      const xml = phraseXml(p)
+      expect(xml).toContain('<measure number="0" implicit="yes">')
+      // After the count-in, the pickup's first note falls on its beat of the bar.
+      expect(phraseEvents(p, 60)[0].onsetMs).toBe((p.meter - p.pickup) * 1000)
+    }
+  })
+
+  it('never happen when not asked', () => {
+    const rnd = seeded(3)
+    for (let i = 0; i < 30; i++) expect(nextPhrase(3, rnd, 'never').pickup).toBe(0)
   })
 })

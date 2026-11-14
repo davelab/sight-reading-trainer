@@ -7,6 +7,9 @@ import {
   nextNote,
   nextRhythm,
   nextShape,
+  barsOf,
+  pickupChoices,
+  rhythmClicks,
   noteLabel,
   positions,
   questionXml,
@@ -213,5 +216,36 @@ describe('arpeggios', () => {
       kinds.add(q.sequence ? 'arpeggio' : q.notes.length === 2 ? 'interval' : 'triad')
     }
     expect(kinds).toEqual(new Set(['arpeggio', 'interval', 'triad']))
+  })
+})
+
+describe('rhythms in levare', () => {
+  it('start before the bar line and shorten the last measure', () => {
+    for (const pickup of [0.5, 1, 2]) {
+      const rnd = seeded(pickup * 10)
+      for (let i = 0; i < 40; i++) {
+        const r = nextRhythm(3, rnd, pickup)
+        expect(r.reduce((s, n) => s + n.length, 0)).toBeCloseTo(8)
+        expect(r[0].start).toBe(0)
+        expect(r[0].rest).toBe(false)
+        const bars = barsOf(8, 4, pickup)
+        expect(bars.map(([a, b]) => b - a)).toEqual([pickup, 4, 4 - pickup])
+        for (const n of r) {
+          const bar = bars.find(([a, b]) => n.start >= a - 1e-9 && n.start < b - 1e-9)!
+          expect(n.start + n.length).toBeLessThanOrEqual(bar[1] + 1e-9)
+        }
+        const xml = rhythmXml(r, pickup)
+        expect(xml).toContain('<measure number="0" implicit="yes">')
+        expect(rhythmEvents(r, 60, pickup)[0].onsetMs).toBe((4 - pickup) * 1000)
+        // Clicks: the first downbeat after the pickup is accented (beat 4 from the start).
+        const clicks = rhythmClicks(60, pickup)
+        expect(clicks.find((c) => c.ms === 4000)?.accent).toBe(true)
+      }
+    }
+  })
+
+  it('choose shorter pickups at easier levels', () => {
+    expect(pickupChoices(0)).toEqual([1])
+    expect(pickupChoices(2)).toEqual([1, 0.5, 2])
   })
 })

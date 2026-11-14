@@ -8,7 +8,8 @@ import {
   phraseXml,
   SOLFEGE_LEVELS,
   type LyricMode,
-  type Phrase
+  type Phrase,
+  type PickupMode
 } from '../../lib/solfege'
 import { useMidi } from '../../stores/midi'
 import { useTransport } from '../../stores/transport'
@@ -21,10 +22,11 @@ interface SolfegeSettings {
   mode: 'notes' | 'rhythm'
   bpm: number
   lyrics: LyricMode
+  pickup: PickupMode
 }
 
 const KEY = 'solfege-settings'
-const DEFAULTS: SolfegeSettings = { level: 0, mode: 'notes', bpm: 72, lyrics: 'syllables' }
+const DEFAULTS: SolfegeSettings = { level: 0, mode: 'notes', bpm: 72, lyrics: 'syllables', pickup: 'sometimes' }
 
 function load(): SolfegeSettings {
   try {
@@ -43,7 +45,7 @@ const VERDICT_TEXT = { correct: 'a tempo', early: 'in anticipo', late: 'in ritar
  */
 export function SolfegeDrill() {
   const [s, setS] = useState<SolfegeSettings>(load)
-  const [phrase, setPhrase] = useState<Phrase>(() => nextPhrase(load().level))
+  const [phrase, setPhrase] = useState<Phrase>(() => nextPhrase(load().level, Math.random, load().pickup))
   const [verdicts, setVerdicts] = useState<Record<number, NoteJudgement>>({})
   const [state, setState] = useState<'idle' | 'listening' | 'playing'>('idle')
   const [result, setResult] = useState<string | null>(null)
@@ -139,8 +141,8 @@ export function SolfegeDrill() {
     else if (state === 'listening') await ipc.pause()
   }
 
-  const fresh = (levelIndex = s.level) => {
-    setPhrase(nextPhrase(levelIndex))
+  const fresh = (levelIndex = s.level, pickup = s.pickup) => {
+    setPhrase(nextPhrase(levelIndex, Math.random, pickup))
     setVerdicts({})
     setResult(null)
   }
@@ -176,6 +178,21 @@ export function SolfegeDrill() {
           >
             <option value="notes">Note e ritmo</option>
             <option value="rhythm">Solo ritmo (un tasto qualsiasi)</option>
+          </select>
+        </label>
+        <label title="La frase comincia prima della prima stanghetta (di solito Sol → Do); l'ultima battuta è accorciata di altrettanto">
+          Levare
+          <select
+            value={s.pickup}
+            disabled={busy}
+            onChange={(e) => {
+              set({ pickup: e.target.value as PickupMode })
+              fresh(s.level, e.target.value as PickupMode)
+            }}
+          >
+            <option value="never">Mai</option>
+            <option value="sometimes">A volte</option>
+            <option value="always">Sempre</option>
           </select>
         </label>
         <label>
@@ -215,7 +232,11 @@ export function SolfegeDrill() {
           </button>
         )}
         <span className="drill-live">
-          {phrase.key.name} · {phrase.meter}/4 · {level.hint}
+          {phrase.key.name} · {phrase.meter}/4
+          {phrase.pickup
+            ? ` · in levare (${phrase.pickup === 1 ? '1 movimento' : `${phrase.pickup} movimenti`})`
+            : ''}{' '}
+          · {level.hint}
         </span>
       </div>
       <div className="drill-stage" ref={stage}>

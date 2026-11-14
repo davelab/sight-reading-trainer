@@ -5,7 +5,7 @@
  * steps, a leap is followed by a step the other way, the phrase ends on the
  * tonic approached from the 2nd or the 7th degree.
  */
-import { beamsFor, type RhythmNote } from './drills'
+import { barsOf, beamsFor, pickupLead, type RhythmNote } from './drills'
 
 export type Random = () => number
 
@@ -271,6 +271,7 @@ function measureCells(level: SolfegeLevel, beats: number, last: boolean, first: 
         CELLS.half
       ]
     if (beats === 3 && level.cells.includes('dottedHalf')) return end
+    if (beats === 1) return [CELLS.ta] // shortened by a pickup
     return beats === 3 ? [CELLS.ta, CELLS.half] : end
   }
   for (let tries = 0; tries < 40; tries++) {
@@ -321,39 +322,68 @@ export interface Phrase {
   meter: number
   notes: PhraseNote[]
   level: number
+  /** Quarters before the first bar line (0: the phrase starts on the downbeat). */
+  pickup: number
 }
 
+/** Whether phrases start in levare: never, now and then, or always. */
+export type PickupMode = 'never' | 'sometimes' | 'always'
+
 /** A phrase of `level` (0-5): rhythm from the level's cells, melody by the rules. */
-export function nextPhrase(levelIndex: number, rnd: Random = Math.random): Phrase {
+export function nextPhrase(levelIndex: number, rnd: Random = Math.random, pickupMode: PickupMode = 'never'): Phrase {
   const level = SOLFEGE_LEVELS[Math.max(0, Math.min(SOLFEGE_LEVELS.length - 1, levelIndex))]
   const [fifths, mode] = pick(level.keys, rnd)
   const key = makeKey(fifths, mode)
   const meter = pick(level.meters, rnd)
   const notes: PhraseNote[] = []
+  // A pickup of one beat (two in 3/4 and 4/4 from level 4): the last measure is
+  // shortened by as much, so the phrase still has whole measures.
+  const wantsPickup = pickupMode === 'always' || (pickupMode === 'sometimes' && rnd() < 0.5)
+  const pickup = !wantsPickup ? 0 : levelIndex >= 3 && meter >= 3 && rnd() < 0.4 ? 2 : 1
   let t = 0
-  for (let m = 0; m < level.measures; m++) {
-    for (const cell of measureCells(level, meter, m === level.measures - 1, m === 0, rnd)) {
-      cell.lengths.forEach((length, i) => {
-        notes.push({
-          start: t,
-          length: Math.abs(length),
-          rest: length < 0,
-          triplet: !!cell.triplet,
-          degree: 0,
-          alter: 0,
-          syllable: cell.syllables[i]
-        })
-        t += Math.abs(length)
+  const push = (cell: Cell) =>
+    cell.lengths.forEach((length, i) => {
+      notes.push({
+        start: t,
+        length: Math.abs(length),
+        rest: length < 0,
+        triplet: !!cell.triplet,
+        degree: 0,
+        alter: 0,
+        syllable: cell.syllables[i]
       })
+      t += Math.abs(length)
+    })
+  if (pickup) {
+    const oneBeat = level.cells.map((id) => CELLS[id]).filter((c) => Math.abs(span(c) - 1) < 1e-9 && c.lengths[0] > 0)
+    for (let b = 0; b < pickup; b++) push(pick(oneBeat.length ? oneBeat : [CELLS.ta], rnd))
+  }
+  for (let m = 0; m < level.measures; m++) {
+    const last = m === level.measures - 1
+    for (const cell of measureCells(level, last ? meter - pickup : meter, last, m === 0, rnd)) {
+      push(cell)
     }
   }
   // Pitches: start on 1, 3 or 5; end on the tonic from the 2nd or the 7th.
+  // In levare: the pickup leads to the tonic on the first downbeat, from the
+  // 5th below (Sol-Do) or from the leading tone, by step when it has more notes.
   const sounding = notes.filter((n) => !n.rest)
-  let degree = key.tonic + pick(level.range[1] >= 4 ? [0, 2, 4] : [0, 2], rnd)
+  const inPickup = sounding.filter((n) => n.start < pickup - 1e-9).length
+  const [lo] = bounds(level, key)
+  const into = key.tonic - 3 >= lo && rnd() < 0.6 ? key.tonic - 3 : key.tonic - 1
+  let degree = inPickup ? into : key.tonic + pick(level.range[1] >= 4 ? [0, 2, 4] : [0, 2], rnd)
   let lastMove = 0
   sounding.forEach((n, i) => {
     const left = sounding.length - 1 - i
-    if (i > 0) {
+    if (i < inPickup) {
+      // Up to it by step, or down to it when there is no room below.
+      const steps = inPickup - 1 - i
+      degree = into - (inPickup - 1) >= lo ? into - steps : into + steps
+      lastMove = i > 0 ? 1 : 0
+    } else if (i === inPickup && inPickup > 0) {
+      lastMove = key.tonic - degree
+      degree = key.tonic
+    } else if (i > 0) {
       const next = nextDegree(degree, lastMove, level, key, rnd)
       lastMove = next - degree
       degree = next
@@ -383,7 +413,7 @@ export function nextPhrase(levelIndex: number, rnd: Random = Math.random): Phras
       }
     }
   }
-  return { key, meter, notes, level: levelIndex }
+  return { key, meter, notes, level: levelIndex, pickup }
 }
 
 // --- MusicXML and events ---------------------------------------------------------------
@@ -405,12 +435,16 @@ export type LyricMode = 'none' | 'syllables' | 'names'
 /** The phrase as MusicXML on a treble staff, with key, meter and an optional lyric line. */
 export function phraseXml(p: Phrase, lyrics: LyricMode = 'none'): string {
   const measures: string[] = []
-  const count = Math.round(p.notes.reduce((s, n) => s + n.length, 0) / p.meter)
+  const total = p.notes.reduce((x, n) => x + n.length, 0)
+  const bars = barsOf(total, p.meter, p.pickup)
+  const count = bars.length
   for (let m = 0; m < count; m++) {
-    const inMeasure = p.notes.filter((n) => n.start >= m * p.meter - 1e-9 && n.start < (m + 1) * p.meter - 1e-9)
+    const [from, to] = bars[m]
+    const inMeasure = p.notes.filter((n) => n.start >= from - 1e-9 && n.start < to - 1e-9)
+    const offset = m === 0 && p.pickup > 0 ? p.meter - p.pickup : 0
     const beams = beamsFor(
       inMeasure.map(
-        (n) => ({ start: n.start - m * p.meter, length: n.length, rest: n.rest, triplet: n.triplet }) as RhythmNote
+        (n) => ({ start: n.start - from + offset, length: n.length, rest: n.rest, triplet: n.triplet }) as RhythmNote
       )
     )
     const shown = new Map<number, number>() // diatonic -> alteration in force in this measure
@@ -450,7 +484,10 @@ export function phraseXml(p: Phrase, lyrics: LyricMode = 'none'): string {
         ? `<attributes><divisions>${DIV}</divisions><key><fifths>${p.key.fifths}</fifths><mode>${p.key.mode}</mode></key><time><beats>${p.meter}</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>`
         : ''
     const bar = m === count - 1 ? '<barline location="right"><bar-style>light-heavy</bar-style></barline>' : ''
-    measures.push(`<measure number="${m + 1}">${attrs}${body}${bar}</measure>`)
+    const number = p.pickup > 0 ? m : m + 1
+    measures.push(
+      `<measure number="${number}"${p.pickup > 0 && m === 0 ? ' implicit="yes"' : ''}>${attrs}${body}${bar}</measure>`
+    )
   }
   return `<?xml version="1.0" encoding="UTF-8"?><score-partwise version="4.0"><part-list><score-part id="P1"><part-name></part-name></score-part></part-list><part id="P1">${measures.join('')}</part></score-partwise>`
 }
@@ -458,22 +495,23 @@ export function phraseXml(p: Phrase, lyrics: LyricMode = 'none'): string {
 /** Notes for the Rust transport (to hear it, or to judge it), at `bpm`. */
 export function phraseEvents(p: Phrase, bpm: number) {
   const q = 60000 / bpm
+  const lead = pickupLead(p.pickup, p.meter)
   return p.notes
     .filter((n) => !n.rest)
     .map((n, i) => ({
       noteId: `solfege-${i}`,
       pitch: midiOf(n.degree, n.alter),
-      onsetMs: n.start * q,
+      onsetMs: (n.start + lead) * q,
       durMs: n.length * q * 0.92,
       velocity: 80,
       staff: 1,
-      measure: Math.floor(n.start / p.meter + 1e-9) + 1
+      measure: n.start < p.pickup ? 0 : Math.floor((n.start - p.pickup) / p.meter + 1e-9) + 1
     }))
 }
 
 /** One click per beat, accent on each downbeat. */
 export function phraseClicks(p: Phrase, bpm: number) {
   const q = 60000 / bpm
-  const total = Math.round(p.notes.reduce((s, n) => s + n.length, 0))
+  const total = Math.round(p.notes.reduce((s, n) => s + n.length, 0) + pickupLead(p.pickup, p.meter))
   return Array.from({ length: total }, (_, i) => ({ ms: i * q, accent: i % p.meter === 0 }))
 }
