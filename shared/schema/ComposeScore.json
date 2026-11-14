@@ -1,0 +1,100 @@
+{
+  "$defs": {
+    "OmrWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "staff": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "duration",
+            "page"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "measure",
+        "kind",
+        "message"
+      ],
+      "title": "OmrWarning",
+      "type": "object"
+    },
+    "TranscribeFacts": {
+      "additionalProperties": false,
+      "description": "What the transcription inferred about the performance.",
+      "properties": {
+        "tempo": {
+          "description": "Median beat, in quarter notes per minute",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "beatsPerMeasure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "key": {
+          "description": "e.g. 'G major', 'Bb minor'",
+          "type": "string"
+        },
+        "pickupBeats": {
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "tempo",
+        "beatsPerMeasure",
+        "key",
+        "pickupBeats"
+      ],
+      "title": "TranscribeFacts",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of ``compose.transcribe``: a live recording as a score.",
+  "properties": {
+    "musicxml": {
+      "type": "string"
+    },
+    "midi": {
+      "description": "The performance as played (with pedal), base64 Standard MIDI File",
+      "type": "string"
+    },
+    "facts": {
+      "$ref": "#/$defs/TranscribeFacts"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/OmrWarning"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "musicxml",
+    "midi",
+    "facts",
+    "warnings"
+  ],
+  "title": "ComposeScore",
+  "type": "object"
+}

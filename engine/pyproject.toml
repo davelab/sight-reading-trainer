@@ -1,0 +1,58 @@
+[project]
+name = "score-engine"
+version = "0.1.0"
+description = "Score Studio analysis engine: JSON-RPC 2.0 sidecar over stdin/stdout"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.7,<3",
+    "music21>=9.1",
+    "homr[cpu]==0.7.1",  # pinned: omr/homr_backend.py patches its model paths
+    "pypdfium2>=4",
+    "soundfile>=0.12",
+    "scipy>=1.11",
+    "anthropic>=1",
+    "mido>=1.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+score-engine = "score_engine.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["score_engine"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+# onnxruntime stopped publishing Intel-Mac wheels after 1.23.2, while homr 0.7.1
+# asks for >= 1.24.1. On Intel Macs use 1.23.2: homr's tests (including the real
+# OMR exit test) pass with it. Everywhere else keep homr's own requirement.
+override-dependencies = [
+    "onnxruntime==1.23.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "onnxruntime>=1.24.1,<2; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+]
+# Fail the lock here, not on a user's Mac, if a platform loses its wheels.
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]

@@ -1,0 +1,105 @@
+.transport {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--chrome);
+}
+.transport-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.transport .play {
+  min-width: 44px;
+  font-size: 1.1rem;
+}
+.transport .time {
+  font-variant-numeric: tabular-nums;
+  min-width: 90px;
+}
+.transport .tempo input {
+  width: 140px;
+}
+.transport .tempo output {
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+}
+.transport .armed {
+  background: var(--accent);
+  color: white;
+}
+.loop-label {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.segmented {
+  gap: 0;
+}
+.segmented button {
+  border-radius: 0;
+}
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.segmented button + button {
+  border-left: none;
+}
+.segmented .selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.synth-status {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.hand-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: 1px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6);
+}
+.hand-dot.right {
+  background: var(--hand-right);
+}
+.hand-dot.left {
+  background: var(--hand-left);
+}
+.hand-dot + .hand-dot {
+  margin-left: -3px;
+}
+.transport .seek {
+  flex-basis: 100%;
+  margin: 0 0 2px;
+  accent-color: var(--accent);
+}
+.transport .transpose {
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.transport .gear {
+  font-size: 1.05rem;
+}
+.transport-group > button.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.transport-group > button.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+}

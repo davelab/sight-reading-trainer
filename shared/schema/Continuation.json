@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "OmrWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "staff": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "duration",
+            "page"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "measure",
+        "kind",
+        "message"
+      ],
+      "title": "OmrWarning",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of ``compose.continue``: Claude's advice and the measures it added.",
+  "properties": {
+    "musicxml": {
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/OmrWarning"
+      },
+      "type": "array"
+    },
+    "advice": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "added": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "firstNew": {
+      "description": "Ordinal of the first new measure",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "problems": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "musicxml",
+    "warnings",
+    "advice",
+    "added",
+    "firstNew",
+    "problems"
+  ],
+  "title": "Continuation",
+  "type": "object"
+}

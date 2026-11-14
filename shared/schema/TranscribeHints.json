@@ -1,0 +1,63 @@
+{
+  "additionalProperties": false,
+  "description": "What the user already knows about the piece (``transcribe.run``); every field\nis optional and the transcription infers what is missing.",
+  "properties": {
+    "tempo": {
+      "anyOf": [
+        {
+          "maximum": 300,
+          "minimum": 20,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Approximate quarter notes per minute"
+    },
+    "beatsPerMeasure": {
+      "anyOf": [
+        {
+          "maximum": 4,
+          "minimum": 2,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Quarter-note meter: 2, 3 or 4"
+    },
+    "key": {
+      "anyOf": [
+        {
+          "pattern": "^[A-G](#|b)? (major|minor)$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "e.g. 'G major', 'Bb minor'"
+    },
+    "pickupBeats": {
+      "anyOf": [
+        {
+          "maximum": 3,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Beats before the first bar line"
+    }
+  },
+  "title": "TranscribeHints",
+  "type": "object"
+}

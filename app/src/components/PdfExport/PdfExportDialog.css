@@ -1,0 +1,54 @@
+.pdf-dialog {
+  width: min(860px, calc(100vw - 32px));
+}
+.pdf-body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+}
+.pdf-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pdf-options h4 {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+.pdf-row {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between;
+  align-items: center;
+}
+.pdf-check {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+}
+.pdf-presets {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.pdf-presets button {
+  font-size: 12px;
+}
+.pdf-preview {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  background: white;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.12);
+}
+.pdf-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+@media (max-width: 720px) {
+  .pdf-body {
+    grid-template-columns: 1fr;
+  }
+}
