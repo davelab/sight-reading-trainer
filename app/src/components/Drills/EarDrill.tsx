@@ -135,8 +135,11 @@ export function EarDrill() {
   const confusions = topConfusions(stats, s.mode)
 
   // Answer buttons for the mode.
-  const intervalChoices = INTERVALS.filter((i) => s.intervals.includes(i.id))
-  const chordChoices = CHORDS.filter((c) => s.groups.includes(c.group))
+  // Same fallbacks as the question generators when nothing is selected.
+  const picked = INTERVALS.filter((i) => s.intervals.includes(i.id))
+  const intervalChoices = picked.length ? picked : INTERVALS.filter((i) => i.id === 'P5')
+  const groups = s.groups.length ? s.groups : ['triads']
+  const chordChoices = CHORDS.filter((c) => groups.includes(c.group))
   const buttonClass = (id: string) =>
     !given || !question ? '' : id === question.answer ? 'ear-right' : id === given ? 'ear-wrong' : ''
 
