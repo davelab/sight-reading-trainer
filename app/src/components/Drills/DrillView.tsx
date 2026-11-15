@@ -25,10 +25,11 @@ import { useMidi } from '../../stores/midi'
 import { useTransport } from '../../stores/transport'
 import { TOLERANCE_MS, useView } from '../../stores/view'
 import { Snippet } from './Snippet'
+import { EarDrill } from './EarDrill'
 import { SolfegeDrill } from './SolfegeDrill'
 import './DrillView.css'
 
-type Tab = 'notes' | 'shapes' | 'rhythm' | 'solfege'
+type Tab = 'notes' | 'shapes' | 'rhythm' | 'solfege' | 'ear'
 
 interface DrillSettings {
   tab: Tab
@@ -105,7 +106,8 @@ export function DrillView() {
             ['notes', 'Lettura note'],
             ['shapes', 'Intervalli e accordi'],
             ['rhythm', 'Ritmo'],
-            ['solfege', 'Solfeggio']
+            ['solfege', 'Solfeggio'],
+            ['ear', 'Orecchio']
           ] as const
         ).map(([value, label]) => (
           <button
@@ -122,7 +124,9 @@ export function DrillView() {
       {!inTauri && (
         <p className="drill-note">Gli esercizi usano il piano MIDI o la tastiera a schermo: apri l'app desktop.</p>
       )}
-      {settings.tab === 'solfege' ? (
+      {settings.tab === 'ear' ? (
+        <EarDrill />
+      ) : settings.tab === 'solfege' ? (
         <SolfegeDrill />
       ) : settings.tab === 'rhythm' ? (
         <RhythmDrill settings={settings} set={set} />
