@@ -101,10 +101,10 @@ fn spawn_position_emitter(app: AppHandle, engine: SharedEngine) {
         .expect("spawn position thread");
 }
 
-/// Event name parts for a sidecar job notification (`omr.*`, `transcribe.*`).
+/// Event name parts for a sidecar job notification (`omr.*`, `transcribe.*`, `separate.*`).
 fn notification_event(method: &str) -> Option<(&str, &str)> {
     let (job, event) = method.split_once('.')?;
-    matches!(job, "omr" | "transcribe").then_some((job, event))
+    matches!(job, "omr" | "transcribe" | "separate").then_some((job, event))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -170,6 +170,9 @@ pub fn run() {
             commands::set_api_key,
             commands::transcribe_audio,
             commands::transcribe_cancel,
+            commands::separate_models,
+            commands::separate_audio,
+            commands::separate_cancel,
             commands::save_binary_file,
             commands::score_edit,
             commands::score_check,
@@ -199,6 +202,7 @@ mod tests {
     fn job_notifications_become_events() {
         assert_eq!(notification_event("omr.progress"), Some(("omr", "progress")));
         assert_eq!(notification_event("transcribe.done"), Some(("transcribe", "done")));
+        assert_eq!(notification_event("separate.progress"), Some(("separate", "progress")));
         assert_eq!(notification_event("analyze.done"), None);
         assert_eq!(notification_event("ping"), None);
     }

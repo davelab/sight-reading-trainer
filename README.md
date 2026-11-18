@@ -255,6 +255,29 @@ lo scarica da Zenodo e lo converte una volta (vedi «Installazione», passo 2).
 
 La M6 (firma, notarizzazione, beta) è sospesa: l'app è per uso personale.
 
+### Isola il pianoforte da una canzone (su richiesta)
+
+**File → Isola il pianoforte…**: scegli un brano (MP3, WAV, M4A, FLAC…) e il
+modello; l'app scrive accanto al brano (o nella cartella che scegli) due WAV a
+44,1 kHz: `<brano> - piano.wav` (solo il pianoforte) e `<brano> - senza
+piano.wav` (tutto il resto: una base per suonarci sopra). «Trascrivi il
+piano…» passa poi il piano isolato alla trascrizione.
+
+Tutto in locale, senza servizi esterni né costi. Due modelli open-weight a 6
+stem, in ONNX (esportati da [unblend](https://github.com/Ryan5453/unblend),
+fissati a una revisione di Hugging Face e verificati con SHA-256), scaricati
+nella cartella dati dell'app al primo uso:
+
+| Modello | Download | Tempo (CPU, 4 core) | Piano su un mix di prova |
+|---|---|---|---|
+| Veloce — HTDemucs 6 stem (Meta) | 56 MB | ~⅓ della durata del brano | +3,5 dB SNR |
+| Qualità — BS-RoFormer SW (jarredou) | 351 MB | ~4× la durata del brano | +7,1 dB SNR |
+
+(Il mix di prova intero, preso come «piano», vale −10,8 dB.) La separazione va
+in background: la finestra si può nascondere e il menu File mostra
+l'avanzamento. STFT e ricomposizione dei segmenti sono in NumPy
+(`engine/score_engine/separate/`), uguali a `torch.stft`/`torch.istft`.
+
 ## Requisiti
 
 - macOS 10.15 Catalina o successivo (Apple Silicon o Intel), Xcode Command Line Tools
@@ -441,7 +464,10 @@ nel sidecar `omr` dell'app (decisione presa per la M5). Chi distribuisce l'app
 impacchettata con homr deve offrire ai destinatari il sorgente completo
 corrispondente sotto AGPL-3.0. Il modello di trascrizione
 ([piano_transcription_inference](https://github.com/qiuqiangkong/piano_transcription_inference),
-ByteDance) è MIT. Prima di vendere l'app serve un parere legale
+ByteDance) è MIT. Per isolare il pianoforte: i pesi di HTDemucs (Meta) non
+hanno una licenza esplicita (il codice è MIT); quelli di BS-RoFormer SW sono
+**CC-BY-NC-SA-4.0, solo uso non commerciale**: vanno bene per l'uso personale,
+non per un'app venduta. Prima di vendere l'app serve un parere legale
 (vedi `docs/SPEC.md`, «Rischi e decisioni aperte»).
 
 ## Note di architettura

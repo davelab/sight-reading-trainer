@@ -7,6 +7,7 @@ import { DrillView } from './components/Drills'
 import { TabBar } from './components/Tabs'
 import { anyUnsaved } from './stores/documents'
 import { PdfExportDialog, usePdfDialog } from './components/PdfExport'
+import { SeparateDialog } from './components/Separate'
 import { Menu, type MenuEntry } from './components/Menu'
 import { TimedSummaryCard } from './components/Practice'
 import { FallingNotes } from './components/FallingNotes'
@@ -29,6 +30,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { AUDIO_EXTENSIONS, MIDI_EXTENSIONS, SCORE_EXTENSIONS, openScoreFile, openScorePath } from './lib/loadScore'
 import { useMidi } from './stores/midi'
 import { useOmr } from './stores/omr'
+import { openSeparate, overallProgress, useSeparate } from './stores/separate'
 import { useScore } from './stores/score'
 import { useTransport } from './stores/transport'
 import { useView } from './stores/view'
@@ -134,6 +136,9 @@ export default function App() {
     if (typeof path === 'string') await openScorePath(path)
   }
 
+  const separatingJob = useSeparate((s) => s.jobId)
+  const separatingProgress = useSeparate((s) => s.progress)
+
   const fileMenu: MenuEntry[] = [
     { label: 'Apri…', shortcut: '⌘O', hint: 'MusicXML, MXL, PDF o MIDI', onSelect: () => void openDialog() },
     {
@@ -147,6 +152,15 @@ export default function App() {
       hint: 'Da una registrazione di pianoforte (MP3, WAV, M4A…) o da un file MIDI a partitura',
       disabled: !inTauri,
       onSelect: () => void transcribeDialog()
+    },
+    {
+      label: 'Isola il pianoforte…',
+      hint: separatingJob
+        ? `Separazione in corso: ${Math.round(overallProgress(separatingProgress) * 100)}%`
+        : 'Da una canzone: il piano da solo e il brano senza piano (WAV), poi la trascrizione',
+      highlight: !!separatingJob,
+      disabled: !inTauri,
+      onSelect: () => void openSeparate()
     },
     null,
     {
@@ -277,6 +291,7 @@ export default function App() {
       <TranscribeSetup />
       <ClaudeKeyDialog />
       <PdfExportDialog />
+      <SeparateDialog />
       <Keyboard />
       <Transport />
       {dropping && <div className="drop-overlay">Rilascia per aprire</div>}

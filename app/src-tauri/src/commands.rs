@@ -383,6 +383,44 @@ pub async fn transcribe_audio(
         .map_err(|e| e.to_string())?
 }
 
+/// The piano separation models and whether each is downloaded (`omr` sidecar).
+#[tauri::command]
+pub async fn separate_models(state: State<'_, AppState>) -> CmdResult<serde_json::Value> {
+    let client = state.omr.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        client.request("separate.models", serde_json::json!({}), Duration::from_secs(120))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Start isolating the piano of a song (`model`: "fast" or "quality") into
+/// `out_dir`. Returns `{jobId}` at once; progress and outcome arrive as
+/// `separate:progress`, `separate:done`, `separate:failed`.
+#[tauri::command]
+pub async fn separate_audio(
+    state: State<'_, AppState>,
+    path: String,
+    model: String,
+    out_dir: String,
+) -> CmdResult<serde_json::Value> {
+    let client = state.omr.clone();
+    let params = serde_json::json!({ "audioPath": path, "model": model, "outDir": out_dir });
+    tauri::async_runtime::spawn_blocking(move || client.request("separate.run", params, Duration::from_secs(120)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn separate_cancel(state: State<'_, AppState>, job_id: String) -> CmdResult<serde_json::Value> {
+    let client = state.omr.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        client.request("separate.cancel", serde_json::json!({ "jobId": job_id }), Duration::from_secs(10))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn transcribe_cancel(state: State<'_, AppState>, job_id: String) -> CmdResult<serde_json::Value> {
     let client = state.omr.clone();

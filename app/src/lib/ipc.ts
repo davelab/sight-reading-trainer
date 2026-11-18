@@ -14,6 +14,9 @@ import type {
   RefineResult,
   ComposeScore,
   Continuation,
+  SeparateProgress,
+  SeparateResult,
+  SeparationModels,
   TranscribeHints,
   TranscribeProgress,
   TranscribeResult
@@ -156,7 +159,14 @@ export const ipc = {
   /** Start transcribing a piano recording; progress and result arrive as transcribe:* events. */
   transcribeAudio: (path: string, hints: TranscribeHints = {}) =>
     invoke<{ jobId: string }>('transcribe_audio', { path, hints }),
-  transcribeCancel: (jobId: string) => invoke<{ cancelled: boolean }>('transcribe_cancel', { jobId })
+  transcribeCancel: (jobId: string) => invoke<{ cancelled: boolean }>('transcribe_cancel', { jobId }),
+
+  /** The piano separation models and whether each is downloaded. */
+  separateModels: () => invoke<SeparationModels>('separate_models'),
+  /** Start isolating the piano of a song; progress and result arrive as separate:* events. */
+  separateAudio: (path: string, model: 'fast' | 'quality', outDir: string) =>
+    invoke<{ jobId: string }>('separate_audio', { path, model, outDir }),
+  separateCancel: (jobId: string) => invoke<{ cancelled: boolean }>('separate_cancel', { jobId })
 }
 
 /** Mirrors EditAction in engine/score_engine/models.py. */
@@ -195,6 +205,18 @@ export function onOmrDone(cb: (r: OmrResult) => void): Promise<UnlistenFn> {
 
 export function onOmrFailed(cb: (f: OmrFailed) => void): Promise<UnlistenFn> {
   return listen<OmrFailed>('omr:failed', (e) => cb(e.payload))
+}
+
+export function onSeparateProgress(cb: (p: SeparateProgress) => void): Promise<UnlistenFn> {
+  return listen<SeparateProgress>('separate:progress', (e) => cb(e.payload))
+}
+
+export function onSeparateDone(cb: (r: SeparateResult) => void): Promise<UnlistenFn> {
+  return listen<SeparateResult>('separate:done', (e) => cb(e.payload))
+}
+
+export function onSeparateFailed(cb: (f: OmrFailed) => void): Promise<UnlistenFn> {
+  return listen<OmrFailed>('separate:failed', (e) => cb(e.payload))
 }
 
 export function onTranscribeProgress(cb: (p: TranscribeProgress) => void): Promise<UnlistenFn> {
