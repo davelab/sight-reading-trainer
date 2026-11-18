@@ -254,6 +254,40 @@ class TranscribeProgress(_Model):
     fraction: float = Field(ge=0, le=1, description="Progress of the current stage")
 
 
+class SeparationModelInfo(_Model):
+    """One of the piano separation models and whether it is downloaded."""
+
+    id: Literal["fast", "quality"]
+    name: str
+    size_bytes: int = Field(alias="sizeBytes", description="Download size")
+    installed: bool
+    licence: str
+
+
+class SeparationModels(_Model):
+    """Result of ``separate.models``."""
+
+    models: list[SeparationModelInfo]
+
+
+class SeparateProgress(_Model):
+    """Payload of the ``separate.progress`` notification."""
+
+    job_id: str = Field(alias="jobId")
+    stage: Literal["download", "load", "separate", "write"]
+    fraction: float = Field(ge=0, le=1, description="Progress of the current stage")
+
+
+class SeparateResult(_Model):
+    """Payload of ``separate.done``: the piano alone and the song without it."""
+
+    job_id: str = Field(alias="jobId")
+    model: Literal["fast", "quality"]
+    piano_path: str = Field(alias="pianoPath", description="WAV with the piano alone")
+    rest_path: str = Field(alias="restPath", description="WAV with the song minus the piano")
+    duration: float = Field(description="Seconds of audio")
+
+
 EXPORTED_MODELS: dict[str, type[BaseModel]] = {
     "Analysis": Analysis,
     "PingResult": PingResult,
@@ -268,4 +302,7 @@ EXPORTED_MODELS: dict[str, type[BaseModel]] = {
     "RefineResult": RefineResult,
     "ComposeScore": ComposeScore,
     "Continuation": Continuation,
+    "SeparationModels": SeparationModels,
+    "SeparateProgress": SeparateProgress,
+    "SeparateResult": SeparateResult,
 }

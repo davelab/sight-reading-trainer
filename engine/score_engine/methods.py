@@ -76,6 +76,19 @@ def tx_jobs():
     return _tx_jobs
 
 
+_sep_jobs = None
+
+
+def sep_jobs():
+    """The piano separation job runner, created on first use."""
+    global _sep_jobs
+    if _sep_jobs is None:
+        from .separate.jobs import SeparateJobs
+
+        _sep_jobs = SeparateJobs(notify)
+    return _sep_jobs
+
+
 def _require_str(params: dict[str, Any], key: str) -> str:
     value = params.get(key)
     if not isinstance(value, str) or not value:
@@ -203,6 +216,32 @@ def transcribe_run(params: dict[str, Any]) -> dict[str, str]:
 @dispatcher.method("transcribe.cancel")
 def transcribe_cancel(params: dict[str, Any]) -> dict[str, bool]:
     return {"cancelled": tx_jobs().cancel(_require_str(params, "jobId"))}
+
+
+@dispatcher.method("separate.models")
+def separate_models(_params: dict[str, Any]) -> Any:
+    """The piano separation models and whether each is downloaded."""
+    from .separate.jobs import list_models
+
+    return list_models()
+
+
+@dispatcher.method("separate.run")
+def separate_run(params: dict[str, Any]) -> dict[str, str]:
+    """Start isolating the piano of a song; progress arrives as notifications."""
+    path = Path(_require_str(params, "audioPath"))
+    if not path.is_file():
+        raise RpcError(INVALID_PARAMS, f"file not found: {path}")
+    out_dir = Path(params.get("outDir") or path.parent)
+    try:
+        return {"jobId": sep_jobs().start(path, _require_str(params, "model"), out_dir)}
+    except ValueError as e:
+        raise RpcError(INVALID_PARAMS, str(e)) from e
+
+
+@dispatcher.method("separate.cancel")
+def separate_cancel(params: dict[str, Any]) -> dict[str, bool]:
+    return {"cancelled": sep_jobs().cancel(_require_str(params, "jobId"))}
 
 
 @dispatcher.method("omr.refine")

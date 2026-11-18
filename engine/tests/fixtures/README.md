@@ -4,6 +4,7 @@
 |---|---|---|
 | `minuet-in-g.musicxml` | Minuet in G, BWV Anh. 114 (Petzold), simplified two-staff arrangement written for these tests | Public domain |
 | `bach-bwv269.rntxt` | Human Roman-numeral analysis of BWV 269 (analyst Andrew Jones; proofread by Dmitri Tymoczko and Hamish Robb) | [When in Rome](https://github.com/MarkGotham/When-in-Rome), `Corpus/Early_Choral/Bach,_Johann_Sebastian/Chorales/001`, CC BY-SA 4.0 |
+| `a440-mono-22k.wav` | Half a second of a decaying 440 Hz sine, mono, 22.05 kHz (piano separation: loading and resampling) | Generated for these tests |
 | `bach-bwv17.7.rntxt` | Human Roman-numeral analysis of BWV 17.7 | When in Rome, `.../Chorales/007`, CC BY-SA 4.0 |
 
 The scores of the Bach chorales (BWV 269 *Aus meines Herzens Grunde*,
