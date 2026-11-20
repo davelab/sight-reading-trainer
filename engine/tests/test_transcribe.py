@@ -329,12 +329,54 @@ def test_ballad_eighths_are_not_the_beat_and_key_follows_the_bass():
         root, triad = prog[b % 4]
         start = 0.5 + 4 * b * beat
         notes.append(NoteEvent(start, start + 3.8 * beat, root - 12, 85))
-        for k in range(8):
-            pitch = root + 12 + triad[k % 3] + (12 if k >= 4 else 0)
+        chord = [p + 12 if p < 62 else p for p in (root + 12 + i for i in triad)]
+        for k in range(8):  # the chord in eighths, the top note moving
             on = start + k * beat / 2 + rng.normal(0, 0.006)
-            notes.append(NoteEvent(on, on + 0.45 * beat, pitch, 75 if k % 2 else 82))
+            for pitch in chord if k % 2 == 0 else chord[1:]:
+                notes.append(NoteEvent(on, on + 0.45 * beat, pitch, 75 if k % 2 else 82))
     notes.sort(key=lambda n: (n.onset, n.pitch))
     _, facts = to_score(notes, [])
     assert facts["tempo"] in range(72, 81)
     assert facts["beatsPerMeasure"] == 4
     assert facts["key"] == "Eb major"
+
+
+def test_hands_follow_the_music_not_a_fixed_split():
+    """Mozart K 545: an Alberti bass up to G4 under a melody from C5 stays in the
+    left hand; a chord is cut where the hands part (the widest gap)."""
+    from fractions import Fraction as F
+
+    from score_engine.transcribe.notation import Placed, split_hands
+
+    placed = []
+    for bar in range(4):
+        for k, pitch in enumerate([60, 67, 64, 67, 60, 67, 64, 67]):  # C G E G ...
+            t = F(bar * 4) + F(k, 2)
+            placed.append(Placed(t, t + F(1, 2), pitch, 60))
+        for k, pitch in enumerate([72, 76, 79, 77]):
+            placed.append(Placed(F(bar * 4 + k), F(bar * 4 + k + 1), pitch, 80))
+    split_hands(placed, 4)
+    assert all(p.hand == 2 for p in placed if p.pitch < 70)
+    assert all(p.hand == 1 for p in placed if p.pitch >= 72)
+    # A wide chord on its own: the hands part at its widest gap.
+    chord = [Placed(F(0), F(1), x, 70) for x in (43, 50, 55, 67, 71)]
+    split_hands(chord, 4)
+    assert [p.hand for p in chord] == [2, 2, 2, 1, 1]
+
+
+def test_short_pedal_detections_are_not_marked():
+    """Notes ringing on look like brief pedals to the model: under a beat, no mark."""
+    notes = perform(lambda m: 120)
+    xml, _ = to_score(notes, [PedalEvent(0.0, 0.3), PedalEvent(1.0, 1.15), PedalEvent(1.5, 2.9)])
+    assert xml.count('<pedal type="start"') == 1
+
+
+def test_held_notes_do_not_end_on_a_tuplet_in_another_beat():
+    from fractions import Fraction as F
+
+    from score_engine.transcribe.notation import tidy_end
+
+    assert tidy_end(F(0), F(17, 6), None) == 3  # 2 5/6 beats: to the nearest beat
+    assert tidy_end(F(0), F(17, 6), F(5, 2)) == 2  # ... but not past the next attack
+    assert tidy_end(F(1, 3), F(2, 3), None) == F(2, 3)  # within its beat: as it is
+    assert tidy_end(F(0), F(5, 4), None) == F(5, 4)  # a plain position: as it is

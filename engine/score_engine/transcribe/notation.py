@@ -193,26 +193,64 @@ def quantize(notes: list[NoteEvent], beats: np.ndarray, first_downbeat: int) -> 
     return placed
 
 
+HAND_SPAN = 14  # semitones one hand reaches comfortably (a ninth or tenth and a bit)
+HAND_FOLLOW = 0.35  # how fast a hand's position follows the notes it plays
+HAND_GAP = 0.2  # reward per semitone of the gap where the hands are cut
+
+
+def tidy_end(start: Fraction, end: Fraction, nxt: Fraction | None) -> Fraction:
+    """A note held across a beat ends on a plain position of its last beat, not
+    on a triplet or sextuplet one (17/6 of a quarter is a note no one can read):
+    it ends on the nearest beat instead, or the beat before the next attack."""
+    if end <= int(start) + 1 or (end - int(end)).denominator in (1, 2, 4, 8):
+        return end
+    whole = Fraction(round(end))
+    if nxt is not None and whole > nxt:
+        whole = Fraction(int(end))
+    return whole if whole > start else end
+
+
 def split_hands(placed: list[Placed], meter: int) -> None:
-    """Left hand below the split point; the split is the widest pitch gap between
-    E3 and A4 in each measure (middle C when there is no clear gap)."""
-    by_measure: dict[int, list[Placed]] = defaultdict(list)
+    """Right or left hand for every note, attack by attack: the notes struck
+    together are cut at the point that keeps each hand within a hand's span and
+    closest to where that hand has just been playing (a bass line climbing to
+    middle C stays in the left hand, a melody dipping below it in the right)."""
+    del meter  # hands move with the music, not with the bar lines
+    groups: dict[Fraction, list[Placed]] = defaultdict(list)
     for p in placed:
-        by_measure[int(p.onset // meter)].append(p)
-    for notes in by_measure.values():
-        pitches = sorted({p.pitch for p in notes})
-        split = 60
-        gaps = [
-            (b - a, (a + b) / 2)
-            for a, b in zip(pitches, pitches[1:], strict=False)
-            if 52 <= (a + b) / 2 <= 69
-        ]
-        if gaps:
-            width, middle = max(gaps)
-            if width >= 3:
-                split = middle
-        for p in notes:
-            p.hand = 1 if p.pitch >= split else 2
+        groups[p.onset].append(p)
+    # Where the hands start: around the low and high notes of the wide chords
+    # (both hands at once), else G4 and C3.
+    wide = [sorted(p.pitch for p in g) for g in groups.values()]
+    wide = [g for g in wide if g[-1] - g[0] >= 7]
+    left = float(np.clip(np.median([g[0] for g in wide]), 36, 62)) if wide else 48.0
+    right = float(np.clip(np.median([g[-1] for g in wide]), 62, 84)) if wide else 67.0
+    for onset in sorted(groups):
+        notes = sorted(groups[onset], key=lambda p: p.pitch)
+        pitches = [p.pitch for p in notes]
+        best_cut, best_cost = 0, float("inf")
+        for cut in range(len(pitches) + 1):  # pitches[:cut] left, the rest right
+            lo, hi = pitches[:cut], pitches[cut:]
+            cost = 0.0
+            for hand, centre in ((lo, left), (hi, right)):
+                if not hand:
+                    continue
+                span = hand[-1] - hand[0]
+                cost += 4.0 * max(0, span - HAND_SPAN)  # a stretch no hand makes
+                cost += abs(float(np.mean(hand)) - centre) / 4.0
+            if lo and hi:
+                cost -= HAND_GAP * (hi[0] - lo[-1])  # the hands part at a gap
+            # Treble notes belong to the right hand, deep bass to the left.
+            cost += sum(2.0 for x in lo if x >= 72) + sum(2.0 for x in hi if x < 48)
+            if cost < best_cost:
+                best_cut, best_cost = cut, cost
+        for i, p in enumerate(notes):
+            p.hand = 2 if i < best_cut else 1
+        lo, hi = pitches[:best_cut], pitches[best_cut:]
+        if lo:
+            left += HAND_FOLLOW * (float(np.mean(lo)) - left)
+        if hi:
+            right += HAND_FOLLOW * (float(np.mean(hi)) - right)
 
 
 def to_score(
@@ -305,6 +343,7 @@ def to_score(
             end = max(p.end for p in g)
             if nxt is not None:
                 end = min(end, nxt)  # one line of chords per hand: a held note stops at the next
+            end = tidy_end(start, end, nxt)
             length = end - start
             if length <= 0:
                 continue
@@ -316,12 +355,17 @@ def to_score(
     for hand in (1, 2):
         score.insert(0, parts[hand])
     score.insert(0, _staff_group(parts))
-    detected = _hinted_key(hints.key) if hints.key else _choose_key(score, placed, pickup)
+    detected = _hinted_key(hints.key) if hints.key else _choose_key(placed, pickup)
     for part in parts.values():
         part.insert(0, key.KeySignature(detected.sharps))
     _spell(score, detected)
     score = score.makeNotation()
     xml = GeneralObjectExporter(score).parse().decode("utf-8")
+    pedals = [
+        ped
+        for ped in pedals or []
+        if np.diff(to_beats(np.array([ped.onset, ped.offset]), beats))[0] >= PEDAL_MIN_BEATS
+    ]
     if pedals:
         origin = first_downbeat - float(pickup)
         xml = add_pedal_marks(xml, pedals, beats, origin, meter_beats, float(pickup))
@@ -334,14 +378,23 @@ def to_score(
     return xml, facts
 
 
-KEY_MARGIN = 0.1  # correlation within which the opening bass decides between keys
+KEY_MARGIN = 0.15  # correlation within which the opening bass decides between keys
 
 
-def _choose_key(score, placed: list[Placed], pickup: Fraction):  # noqa: ANN001, ANN202
+def _choose_key(placed: list[Placed], pickup: Fraction):  # noqa: ANN202
     """Key from the pitch profile (Krumhansl); among keys that fit almost as well,
     the one whose tonic is the bass of the first downbeat (I-V-vi-IV in Eb rings
     as much Ab as Eb, but it starts on Eb)."""
-    best = score.analyze("key")
+    from music21 import note, stream
+
+    # The profile of what sounds (each note as long as it rings, up to a bar),
+    # not of the written score, where one line per hand shortens held notes.
+    heard = stream.Stream()
+    for p in placed:
+        n = note.Note(p.pitch)
+        n.quarterLength = float(min(max(p.end - p.onset, Fraction(1, 4)), 4))
+        heard.insert(float(p.onset), n)
+    best = heard.analyze("key")
     opening = [p for p in placed if pickup <= p.onset < pickup + 1] or [
         p for p in placed if p.onset >= pickup
     ]
@@ -384,6 +437,9 @@ def _spell(score, k) -> None:  # noqa: ANN001
                 alt.name in scale or (k.sharps < 0 and "-" in alt.name and "#" in p.name)
             ):
                 p.name, p.octave = alt.name, alt.octave
+
+
+PEDAL_MIN_BEATS = 1.0  # shorter "pedals" are notes ringing on, not a pedal pressed
 
 
 def add_pedal_marks(
