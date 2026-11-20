@@ -161,6 +161,13 @@ def regularize(beats: np.ndarray, positions: list[int], meter: int, acc: np.ndar
     return np.array(out)
 
 
+def _grid_cost(xs: list[float], beat: int, g: Fraction) -> float:
+    """Mean distance of the onsets in a beat from grid `g`, plus the grid's cost."""
+    gf = float(g)
+    err = sum(abs(x - beat - round((x - beat) / gf) * gf) for x in xs) / len(xs)
+    return err + GRIDS[g]
+
+
 def quantize(notes: list[NoteEvent], beats: np.ndarray, first_downbeat: int) -> list[Placed]:
     on = to_beats(np.array([n.onset for n in notes]), beats) - first_downbeat
     off = to_beats(np.array([n.offset for n in notes]), beats) - first_downbeat
@@ -171,13 +178,7 @@ def quantize(notes: list[NoteEvent], beats: np.ndarray, first_downbeat: int) -> 
     grid_of: dict[int, Fraction] = {}
     plain = Fraction(1, 4)
     for b, xs in by_beat.items():
-
-        def cost(g: Fraction) -> float:
-            gf = float(g)
-            err = sum(abs(x - b - round((x - b) / gf) * gf) for x in xs) / len(xs)
-            return err + GRIDS[g]
-
-        grid_of[b] = min(GRIDS, key=cost)
+        grid_of[b] = min(GRIDS, key=lambda g, b=b, xs=xs: _grid_cost(xs, b, g))
 
     def snap(x: float) -> Fraction:
         b = int(np.floor(x + 1e-6))
