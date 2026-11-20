@@ -23,8 +23,15 @@ from ..models import TranscribeHints
 from .beats import to_beats, track_beats
 from .postprocess import NoteEvent, PedalEvent
 
-GRIDS = (Fraction(1, 4), Fraction(1, 3))  # sixteenths, triplet eighths... per beat
-TRIPLET_PENALTY = 0.02  # beats of error a triplet grid must save to be chosen
+# Grids a beat can be written in, with the error (in beats) a grid must save over
+# the plain sixteenths to be chosen: a finer grid always fits a little better,
+# only notes actually played on it should earn it.
+GRIDS = {
+    Fraction(1, 4): 0.0,  # sixteenths (and eighths)
+    Fraction(1, 3): 0.02,  # triplet eighths
+    Fraction(1, 8): 0.06,  # thirty-seconds
+    Fraction(1, 6): 0.04,  # sextuplets (triplet sixteenths)
+}
 
 
 @dataclass
@@ -34,6 +41,20 @@ class Placed:
     pitch: int
     velocity: int
     hand: int = 1  # 1 right, 2 left
+
+
+HALF_TIME_ABOVE = 140.0  # bpm: a faster beat is written as half as many beats
+
+
+def half_time(beats: np.ndarray, notes: list[NoteEvent]) -> np.ndarray:
+    """A pulse this fast is the subdivision (eighths of a ballad, a rag's
+    sixteenths-and-eighths), rarely the beat it is written in: keep every other
+    beat, on the phase that carries the accents."""
+    if len(beats) < 4 or 60 / float(np.median(np.diff(beats))) <= HALF_TIME_ABOVE:
+        return beats
+    acc = beat_accents(beats, notes)
+    phase = 0 if acc[0::2].sum() >= acc[1::2].sum() else 1
+    return beats[phase::2]
 
 
 SLIP_COST = 4.0  # in units of the median accent: a measure of the wrong length is rare
@@ -148,23 +169,25 @@ def quantize(notes: list[NoteEvent], beats: np.ndarray, first_downbeat: int) -> 
     for x in on:
         by_beat[int(np.floor(x + 1e-6))].append(float(x))
     grid_of: dict[int, Fraction] = {}
+    plain = Fraction(1, 4)
     for b, xs in by_beat.items():
-        errors = []
-        for g in GRIDS:
+
+        def cost(g: Fraction) -> float:
             gf = float(g)
             err = sum(abs(x - b - round((x - b) / gf) * gf) for x in xs) / len(xs)
-            errors.append(err + (TRIPLET_PENALTY if g.denominator == 3 else 0))
-        grid_of[b] = GRIDS[int(np.argmin(errors))]
+            return err + GRIDS[g]
+
+        grid_of[b] = min(GRIDS, key=cost)
 
     def snap(x: float) -> Fraction:
         b = int(np.floor(x + 1e-6))
-        g = grid_of.get(b, GRIDS[0])
+        g = grid_of.get(b, plain)
         return b + Fraction(round((x - b) / float(g))) * g
 
     placed = []
     for n, a, z in zip(notes, on, off, strict=True):
         start = snap(float(a))
-        end = max(snap(float(z)), start + grid_of.get(int(np.floor(a + 1e-6)), GRIDS[0]))
+        end = max(snap(float(z)), start + grid_of.get(int(np.floor(a + 1e-6)), plain))
         placed.append(Placed(start, end, n.pitch, n.velocity))
     return placed
 
@@ -233,6 +256,8 @@ def to_score(
         positions = [i % meter_beats for i in range(len(beats))]
     else:
         beats = track_beats(notes, tempo=hints.tempo)
+        if not hints.tempo:
+            beats = half_time(beats, notes)
         meter_beats, positions = choose_meter(beats, notes, hints.beats_per_measure, anchor(beats))
         beats = regularize(beats, positions, meter_beats, beat_accents(beats, notes))
         # Re-find the downbeats on the regular grid (no slips left), same meter.
@@ -290,7 +315,7 @@ def to_score(
     for hand in (1, 2):
         score.insert(0, parts[hand])
     score.insert(0, _staff_group(parts))
-    detected = _hinted_key(hints.key) if hints.key else score.analyze("key")
+    detected = _hinted_key(hints.key) if hints.key else _choose_key(score, placed, pickup)
     for part in parts.values():
         part.insert(0, key.KeySignature(detected.sharps))
     _spell(score, detected)
@@ -306,6 +331,28 @@ def to_score(
         "pickupBeats": float(pickup),
     }
     return xml, facts
+
+
+KEY_MARGIN = 0.1  # correlation within which the opening bass decides between keys
+
+
+def _choose_key(score, placed: list[Placed], pickup: Fraction):  # noqa: ANN001, ANN202
+    """Key from the pitch profile (Krumhansl); among keys that fit almost as well,
+    the one whose tonic is the bass of the first downbeat (I-V-vi-IV in Eb rings
+    as much Ab as Eb, but it starts on Eb)."""
+    best = score.analyze("key")
+    opening = [p for p in placed if pickup <= p.onset < pickup + 1] or [
+        p for p in placed if p.onset >= pickup
+    ]
+    if not opening:
+        return best
+    bass = min(p.pitch for p in opening) % 12
+    for k in [best, *best.alternateInterpretations]:
+        if k.correlationCoefficient < best.correlationCoefficient - KEY_MARGIN:
+            break
+        if k.tonic.pitchClass == bass:
+            return k
+    return best
 
 
 def _hinted_key(name: str):  # noqa: ANN202

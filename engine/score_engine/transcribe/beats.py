@@ -170,6 +170,8 @@ PRIOR_BPM, PRIOR_WIDTH = 100.0, 0.8  # likely beat tempo, and its spread in octa
 HINT_WIDTH = 0.35  # spread around a tempo the user gave: rubato yes, 3/2 or 2/1 no
 FORK_WINDOW = 0.4  # of the period: a strong attack this far off may be the beat
 FORK_CLOSENESS = 0.5  # what a forked agent scores for that attack
+TEMPO_JUMP_COST = 0.5  # of the median attack, per 10% of tempo change in one beat
+FORK_CONFIRMED = 1.0  # of the median attack: a beat found this strong is not forked
 
 
 def _step(agent: _Agent, events: list[_Event], correction: float, strong: float) -> list[_Agent]:
@@ -206,18 +208,24 @@ def _step(agent: _Agent, events: list[_Event], correction: float, strong: float)
             )
         error = events[to].time - predicted
         period = float(np.clip(agent.period + correction * error, agent.lowest, agent.highest))
+        # A performer bends the tempo; a sudden jump is more likely a wrong beat.
+        jump = TEMPO_JUMP_COST * strong * abs(np.log2(period / agent.period)) / 0.1
         return _Agent(
             events[to].time,
             period,
             agent.lowest,
             agent.highest,
-            agent.score + gain,
+            agent.score + gain - jump,
             [*agent.beats, events[to].time],
             to + 1,
         )
 
     out = [moved(best, best_value)]
-    out += [moved(k, events[k].salience * FORK_CLOSENESS) for k in forks]
+    # Fork only when the prediction finds no convincing attack: a beat confirmed
+    # on time is no reason to jump (in triplets a strong attack always sits a
+    # third of a beat away, and jumping there loses the beat).
+    if best_value < FORK_CONFIRMED * strong:
+        out += [moved(k, events[k].salience * FORK_CLOSENESS) for k in forks]
     return out
 
 

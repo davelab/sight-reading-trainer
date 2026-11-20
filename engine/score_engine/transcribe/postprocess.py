@@ -126,7 +126,32 @@ def detect_notes(outputs: dict[str, np.ndarray], lead_in: float = 0.0) -> list[N
                 )
             )
     notes.sort(key=lambda n: (n.onset, n.pitch))
-    return notes
+    return drop_harmonic_ghosts(notes)
+
+
+GHOST_INTERVALS = (12, 19, 24)  # octave, twelfth, two octaves: the strong partials
+GHOST_WINDOW = 0.05  # s: struck together
+GHOST_MARGIN = 8  # velocity: this much quieter than the note below it
+
+
+def drop_harmonic_ghosts(notes: list[NoteEvent]) -> list[NoteEvent]:
+    """Remove notes that are an overtone of a louder note struck with them: the
+    model hears the octave, twelfth or double octave of a loud note as a note of
+    its own (more so on a separated stem or with pedal). An octave actually
+    played is kept: the two keys sound about equally loud."""
+    keep = []
+    for n in notes:
+        ghost = any(
+            o.pitch == n.pitch - iv
+            and abs(o.onset - n.onset) <= GHOST_WINDOW
+            and o.velocity >= n.velocity + GHOST_MARGIN
+            for o in notes
+            if abs(o.onset - n.onset) <= GHOST_WINDOW
+            for iv in GHOST_INTERVALS
+        )
+        if not ghost:
+            keep.append(n)
+    return keep
 
 
 def detect_pedals(outputs: dict[str, np.ndarray], lead_in: float = 0.0) -> list[PedalEvent]:

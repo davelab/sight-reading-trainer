@@ -20,7 +20,13 @@ from score_engine.transcribe.beats import to_beats, track_beats
 from score_engine.transcribe.midi import TICKS_PER_SECOND, to_midi
 from score_engine.transcribe.model import deframe, enframe
 from score_engine.transcribe.notation import to_score
-from score_engine.transcribe.postprocess import NoteEvent, PedalEvent, detect_notes, detect_pedals
+from score_engine.transcribe.postprocess import (
+    NoteEvent,
+    PedalEvent,
+    detect_notes,
+    detect_pedals,
+    drop_harmonic_ghosts,
+)
 
 MINUET = Path(__file__).parent / "fixtures" / "minuet-in-g.musicxml"
 METER = 3
@@ -263,3 +269,72 @@ def test_hints_are_validated():
     with pytest.raises(ValueError):
         TranscribeHints.model_validate({"beatsPerMeasure": 7})
     assert TranscribeHints.model_validate({"key": "Bb minor", "tempo": 72}).tempo == 72
+
+
+def test_overtone_ghosts_are_dropped_real_octaves_kept():
+    notes = [
+        NoteEvent(1.00, 2.0, 48, 90),  # C3, loud
+        NoteEvent(1.01, 1.5, 60, 70),  # its octave, much quieter: an overtone
+        NoteEvent(1.02, 1.5, 67, 72),  # its twelfth: an overtone
+        NoteEvent(3.00, 4.0, 50, 80),  # D3 ...
+        NoteEvent(3.01, 4.0, 62, 77),  # ... in octaves, played: about as loud
+        NoteEvent(5.00, 6.0, 55, 60),
+        NoteEvent(5.30, 6.0, 67, 40),  # an octave higher but later: a note of its own
+    ]
+    kept = [(n.pitch, n.onset) for n in drop_harmonic_ghosts(notes)]
+    assert kept == [(48, 1.0), (50, 3.0), (62, 3.01), (55, 5.0), (67, 5.3)]
+
+
+def _bar_pattern(bars: int, bpm: float, beat_notes, seed: int = 0) -> tuple[list[NoteEvent], list]:
+    """Repeat one bar (list of (beat offset, pitch, velocity)) with a little jitter;
+    returns the notes and the true beat times."""
+    rng = np.random.default_rng(seed)
+    beat = 60 / bpm
+    per_bar = max(int(o) for o, _, _ in beat_notes) + 1
+    notes = []
+    for b in range(bars):
+        for o, pitch, vel in beat_notes:
+            on = 0.5 + (b * per_bar + o) * beat + rng.normal(0, 0.008)
+            notes.append(NoteEvent(on, on + 0.3 * beat, pitch, vel))
+    true = [0.5 + i * beat for i in range(bars * per_bar)]
+    return sorted(notes, key=lambda n: (n.onset, n.pitch)), true
+
+
+def test_beats_hold_through_triplets_with_a_weak_beat():
+    """Der Lindenbaum, bars 29-33: a triplet of loud dyads on beat 1, a soft single
+    note on beat 2, then dotted rhythm. The loud triplet notes a third of a beat
+    off must not pull the beat onto them."""
+    bar = [
+        (0, 40, 95), (0, 55, 90), (0, 59, 90),
+        (1 / 3, 52, 80), (1 / 3, 64, 80), (2 / 3, 54, 80), (2 / 3, 66, 80),
+        (1, 67, 45),
+        (1.75, 59, 75), (1.75, 47, 75),
+        (2, 67, 60),
+    ]  # fmt: skip
+    notes, true = _bar_pattern(14, 80, bar)
+    beats = track_beats(notes)
+    period = 60 / 80
+    off = [min(abs(b - t) for b in beats) / period for t in true]
+    assert max(off) < 0.1
+
+
+def test_ballad_eighths_are_not_the_beat_and_key_follows_the_bass():
+    """A ballad at 76 bpm with steady eighths: written at 76 in 4/4, not 152;
+    I-V-vi-IV in Eb sounds as much Ab as Eb, the opening bass decides."""
+    prog = [(51, [0, 4, 7]), (46, [0, 4, 7]), (48, [0, 3, 7]), (44, [0, 4, 7])]
+    notes: list[NoteEvent] = []
+    beat = 60 / 76
+    rng = np.random.default_rng(2)
+    for b in range(16):
+        root, triad = prog[b % 4]
+        start = 0.5 + 4 * b * beat
+        notes.append(NoteEvent(start, start + 3.8 * beat, root - 12, 85))
+        for k in range(8):
+            pitch = root + 12 + triad[k % 3] + (12 if k >= 4 else 0)
+            on = start + k * beat / 2 + rng.normal(0, 0.006)
+            notes.append(NoteEvent(on, on + 0.45 * beat, pitch, 75 if k % 2 else 82))
+    notes.sort(key=lambda n: (n.onset, n.pitch))
+    _, facts = to_score(notes, [])
+    assert facts["tempo"] in range(72, 81)
+    assert facts["beatsPerMeasure"] == 4
+    assert facts["key"] == "Eb major"
