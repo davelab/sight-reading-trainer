@@ -32,7 +32,8 @@ fi
 
 # PyTorch: the newest wheels that exist for this machine. Intel Macs stop at
 # torch 2.2.2, which needs numpy < 2.
-WITH=(--with "piano_transcription_inference==0.0.6" --with onnx --with onnxruntime)
+# audioread: imported by the package, no longer pulled in by recent librosa.
+WITH=(--with "piano_transcription_inference==0.0.6" --with audioread --with onnx --with onnxruntime)
 if [[ "$(uname -s)-$(uname -m)" == Darwin-x86_64 ]]; then
   WITH+=(--with "torch==2.2.2" --with "numpy<2" --with "onnxruntime<1.24")
 else
