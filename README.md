@@ -174,6 +174,7 @@ impostazione:
 
 | **Solfeggio** | Frasi melodiche nuove a 6 livelli (dai gradi congiunti in Do maggiore con semiminime e minime fino a terzine, sincopi, salti d'ottava e minore armonica, con tonalità fino a 4 alterazioni), costruite con le cellule ritmiche classiche (ta, ti-ti, ta-a, ta-i ti, ti-ri-ti-ri, ti ti-ri, sincope, tim-ri, terzina, pause). Melodia con le regole di manuale: gradi congiunti, salto compensato da un grado congiunto in senso opposto, fine sulla tonica dal 2° o dal 7° grado. Sotto le note: sillabe ritmiche, nomi o niente. «Ascolta» la suona col metronomo; «Suona» la fa leggere al piano a tempo (note e ritmo, o solo ritmo) e colora ogni nota |
 | **Orecchio** | Ear training relativo, senza piano: ascolti e scegli la risposta. *Intervalli*: tutti, dall'unisono alla 13ª maggiore (anche 9ª, 11ª, tritono), ascendenti, discendenti, armonici o misti, con insiemi pronti (prime, scala maggiore, semplici, composti, tutti) o scelti a mano. *Colore degli accordi*: il tipo (maggiore, minore, diminuito, aumentato, sus2, sus4, le settime — 7, maj7, m7, ø7, °7, m(maj7), 7sus4 — e gli estesi 6, m6, add9, 9, maj9, m9, 7♭9, 11, 13, maj7♯11), anche rivoltati o arpeggiati. *Accordo esatto*: prima un Do di riferimento, poi l'accordo; scegli tonica e tipo (es. «Si maggiore»). Se sbagli, «La tua scelta» fa sentire la risposta data per confrontarla; conteggio, serie e gli scambi più frequenti |
+| **Tecnica** | Esercizi di Hanon, *Il pianista virtuoso* (edizione Schirmer 1900, pubblico dominio), in MusicXML: fondamentali n. 1, 2, 13, 20; avanzati n. 43 (arpeggi di settima di dominante in 7 tonalità), 48 (terze e seste staccate, esercizio di polso), 50 (terze legate). Ogni scheda ha descrizione, tempo e anteprima; «Apri in Studia» li apre in una scheda con tempo, metronomo, mani separate, loop e «A tempo». Diteggiature della prima battuta in salita e in discesa, 8va come nel libro |
 
 Codice: `lib/drills.ts`, `lib/solfege.ts` (generatori, verifica, statistiche), `components/Drills`.
 
@@ -277,6 +278,22 @@ nella cartella dati dell'app al primo uso:
 in background: la finestra si può nascondere e il menu File mostra
 l'avanzamento. STFT e ricomposizione dei segmenti sono in NumPy
 (`engine/score_engine/separate/`), uguali a `torch.stft`/`torch.istft`.
+
+### Esercizi di Hanon (`scripts/hanon/`)
+
+I MusicXML in `app/src/assets/hanon/` sono generati da `scripts/hanon/hanon.py`
+(più `hanon_parts.py` per le parti II e III): ogni esercizio è descritto con lo
+schema che il libro ripete un grado alla volta, letto sulle pagine scansionate
+(prima battuta, discesa, battute, diteggiature, accordo finale), e verificato
+battuta per battuta contro la lettura OMR delle stesse pagine. Per rigenerarli:
+
+```sh
+cd engine && uv run python ../scripts/hanon/hanon.py ../app/src/assets/hanon
+```
+
+Note: del n. 50 c'è l'esercizio sulle terze legate (non le scale in terze e
+cromatiche che seguono nella stessa pagina); l'accordo finale di Do che lo
+chiude è aggiunto, nel libro si prosegue con le scale.
 
 ## Requisiti
 

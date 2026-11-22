@@ -1,0 +1,72 @@
+[
+  {
+    "number": 1,
+    "title": "Hanon n. 1",
+    "description": "Estensione tra 4° e 5° dito; indipendenza e uniformità di 3, 4, 5.",
+    "tempo": "♩ = 60–108",
+    "bpm": 60,
+    "file": "hanon-01.musicxml",
+    "measures": 30,
+    "page": "1"
+  },
+  {
+    "number": 2,
+    "title": "Hanon n. 2",
+    "description": "Rafforza 3° e 4° dito; posizione estesa con il 5°.",
+    "tempo": "♩ = 60–108",
+    "bpm": 60,
+    "file": "hanon-02.musicxml",
+    "measures": 29,
+    "page": "2"
+  },
+  {
+    "number": 13,
+    "title": "Hanon n. 13",
+    "description": "Esercizio per 3°, 4° e 5° dito, a note alternate.",
+    "tempo": "♩ = 60–108",
+    "bpm": 60,
+    "file": "hanon-13.musicxml",
+    "measures": 29,
+    "page": "13"
+  },
+  {
+    "number": 20,
+    "title": "Hanon n. 20",
+    "description": "Estensione 2-4 e 4-5; esercizio per 2°, 3°, 4° dito su un arpeggio largo.",
+    "tempo": "♩ = 60–108",
+    "bpm": 60,
+    "file": "hanon-20.musicxml",
+    "measures": 31,
+    "page": "20"
+  },
+  {
+    "number": 43,
+    "title": "Hanon n. 43",
+    "description": "Arpeggi sugli accordi di settima di dominante: estensione delle dita e forma della mano.",
+    "tempo": "♩ = 60–120",
+    "bpm": 60,
+    "file": "hanon-43.musicxml",
+    "measures": 33,
+    "page": "69–70"
+  },
+  {
+    "number": 48,
+    "title": "Hanon n. 48",
+    "description": "Esercizio di polso: terze e seste staccate, il braccio fermo e il polso morbido.",
+    "tempo": "𝅗𝅥 = 40–84",
+    "bpm": 80,
+    "file": "hanon-48.musicxml",
+    "measures": 25,
+    "page": "78–79"
+  },
+  {
+    "number": 50,
+    "title": "Hanon n. 50",
+    "description": "Terze legate: ogni nota uguale e ben distinta; le terze sono essenziali nella musica difficile.",
+    "tempo": "𝅗𝅥 = 40–84",
+    "bpm": 80,
+    "file": "hanon-50.musicxml",
+    "measures": 16,
+    "page": "81–82"
+  }
+]
