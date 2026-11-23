@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from hanon import Bar, Event, Exercise, P, Pitch, diatonic
+from hanon import STEPS, Bar, Event, Exercise, P, Pitch, diatonic
 
 LETTERS = "CDEFGAB"
 
@@ -368,8 +368,195 @@ def _legato_thirds() -> list[Bar]:
     return bars
 
 
+# Fingers printed as "upper over lower", stored low note first.
+F31, F42, F53 = [1, 3], [2, 4], [3, 5]  # right hand 3/1, 4/2, 5/3
+L24, L13, L35 = [4, 2], [3, 1], [5, 3]  # left hand 2/4, 1/3, 3/5
+
+
+def _thirds_bar(
+    rh_lows: list[Pitch],
+    rh_highs: list[Pitch],
+    rf: dict[int, list[int]],
+    lf: dict[int, list],
+    held: dict[int, str],
+    rh_staff: str | None = None,
+    lh_staff: str | None = None,
+) -> Bar:
+    """A bar of thirds, the left hand an octave below the right. `held`: dyad ->
+    'u'/'l' (right hand's upper or lower note held, open head); the left hand
+    holds its upper note (the thumb, as the page says)."""
+
+    def down(p: Pitch) -> Pitch:
+        return Pitch(p.step, p.alter, p.octave - 1)
+
+    rh, lh = [], []
+    for j, (lo, hi) in enumerate(zip(rh_lows, rh_highs, strict=True)):
+        h = held.get(j, "")
+        rh.append(
+            Event(
+                [lo, hi],
+                1,
+                rf.get(j, []),
+                int(rh_staff[j]) if rh_staff else None,
+                hollow=[h == "l", h == "u"],
+            )
+        )
+        lh.append(
+            Event(
+                [down(lo), down(hi)],
+                1,
+                lf.get(j, []),
+                int(lh_staff[j]) if lh_staff else None,
+                hollow=[False, bool(h)],
+            )
+        )
+    return Bar(rh, lh)
+
+
+def _scale_in_thirds() -> list[Bar]:
+    """'Scales in Legato Thirds', C major, as printed (3 bars)."""
+
+    def run(start: str, moves: list[int]) -> list[int]:
+        return _run(start, moves)
+
+    lows = [
+        run("C3", [1] * 15),
+        run("E5", [1] * 7 + [-1] * 8),
+        run("C5", [-1] * 14 + [1]),
+    ]
+    held = [
+        {j: "u" for j in (2, 5, 8, 11, 14)},
+        {**{j: "u" for j in (1, 4, 7)}, **{j: "l" for j in (9, 12, 15)}},
+        {j: "l" for j in (2, 5, 8, 11, 14)},
+    ]
+    rf = [
+        {0: F31, 1: F42, 2: F53, 3: F31, 6: F31, 9: F31, 12: F31, 15: F31},
+        {2: F31, 5: F31, 10: F53, 13: F53},
+        {0: F53, 3: F53, 6: F53, 9: F53, 12: F53},
+    ]
+    lf = [
+        {0: L35, 2: ["", "(4)"], 3: L35, 6: L35, 9: L35, 12: L35, 15: L35},
+        {2: L35, 5: L35, 10: L13, 13: L13},
+        {0: L13, 3: L13, 6: L13, 9: L13, 12: L13, 13: L24, 14: L35},
+    ]
+    bars = []
+    for k in range(3):
+        bars.append(
+            _thirds_bar(
+                [diatonic(i) for i in lows[k]],
+                [diatonic(i + 2) for i in lows[k]],
+                rf[k],
+                lf[k],
+                held[k],
+            )
+        )
+    bars[0].words += [
+        (1, 0, "Scales in Legato Thirds.", "above"),
+        (1, 0, "(M.M. ♩ = 40 to 84)", "above"),
+        (1, 2, "(1)", "above"),
+    ]
+    bars[-1].repeat_end = True
+    return bars
+
+
+CHROMATIC_UP = [
+    ("C", 0, "E", -1), ("C", 1, "E", 0), ("D", 0, "F", 0), ("D", 1, "F", 1),
+    ("E", 0, "G", 0), ("E", 1, "G", 1), ("F", 1, "A", 0), ("G", 0, "B", -1),
+    ("G", 1, "B", 0), ("A", 0, "C", 0), ("A", 1, "C", 1), ("B", 0, "D", 0),
+]  # fmt: skip
+CHROMATIC_DOWN = [
+    ("C", 0, "E", -1), ("B", 0, "D", 0), ("B", -1, "D", -1), ("A", 0, "C", 0),
+    ("G", 1, "B", 0), ("G", 0, "B", -1), ("F", 1, "A", 0), ("F", 0, "A", -1),
+    ("E", 0, "G", 0), ("E", -1, "G", -1), ("D", 0, "F", 0), ("C", 1, "E", 0),
+]  # fmt: skip
+
+
+def _chromatic_octave(spelling, octave: int, down: bool) -> tuple[list[Pitch], list[Pitch]]:
+    """One octave of minor thirds from C (going up) or from the C above (down),
+    spelt as the page spells them."""
+    lows, highs = [], []
+    for j, (ls, la, hs, ha) in enumerate(spelling):
+        lo_oct = octave if (not down or j == 0) else octave - 1
+        if down and j == 0:
+            lo_oct = octave
+        lo = Pitch(ls, la, lo_oct)
+        hi_oct = lo_oct + (1 if STEPS.index(hs) < STEPS.index(ls) else 0)
+        lows.append(lo)
+        highs.append(Pitch(hs, ha, hi_oct))
+    return lows, highs
+
+
+def _chromatic_thirds() -> list[Bar]:
+    """'Chromatic scales in minor thirds' (3/4), as printed: three octaves up
+    from C, three down, the held notes as open heads, then the final third."""
+    up_held = {j: "u" for j in (1, 4, 6, 8, 11)}
+    down_held = {j: "l" for j in (0, 3, 5, 7, 10)}
+    all_up_r = [F31, F42, F31, F42, F53, F31, F42, F31, F42, F31, F42, F53]
+    all_up_l = [L24, L13, L35, L24, L13, L24, L13, L24, L13, L35, L24, L13]
+    all_down_r = [F31, F53, F42, F31, F42, F31, F42, F31, F53, F42, F31, F42]
+    all_down_l = [L24, L13, L24, L35, L13, L24, L13, L24, L13, L24, L35, L13]
+    spec = [
+        # (octave, down, rh fingers, lh fingers, rh staffs, lh staffs)
+        (3, False, dict(enumerate(all_up_r)), dict(enumerate(all_up_l)), "2" * 12, "2" * 12),  # noqa: E501
+        (
+            4,
+            False,
+            {j: F31 for j in (0, 2, 5, 7, 9)},
+            {0: L24, 2: L35, 5: L24, 7: L24, 9: L35},
+            "1" * 12,
+            "2" * 12,
+        ),
+        (
+            5,
+            False,
+            {j: F31 for j in (0, 2, 5, 7, 9)},
+            {0: L24, 1: L13, 2: L35, 4: L13, 5: L24, 7: L24, 9: L35},
+            "1" * 12,
+            "1" * 12,
+        ),
+        (6, True, dict(enumerate(all_down_r)), dict(enumerate(all_down_l)), "1" * 12, "1" * 12),
+        (
+            5,
+            True,
+            {0: F31, 1: F53, 4: F42, 6: F42, 8: F53, 11: F42},
+            {1: L13, 3: L35, 4: L13, 6: L13, 8: L13, 11: L13},
+            "1" * 12,
+            "1" + "2" * 11,
+        ),
+        (
+            4,
+            True,
+            {1: F53, 4: F42, 6: F42, 8: F53, 11: F42},
+            {1: L13, 3: L35, 4: L13, 6: L13, 8: L13, 11: L13},
+            "111" + "2" * 9,
+            "2" * 12,
+        ),
+    ]
+    bars = []
+    for octave, down, rf, lf, rs, ls in spec:
+        lows, highs = _chromatic_octave(CHROMATIC_DOWN if down else CHROMATIC_UP, octave, down)
+        bars.append(_thirds_bar(lows, highs, rf, lf, down_held if down else up_held, rs, ls))
+    for b in bars:
+        b.beam = 12
+    bars[0].time = (3, 4)
+    bars[0].repeat_start = True
+    bars[0].words += [
+        (1, 0, "Chromatic scales in minor thirds.", "above"),
+        (1, 0, "(M.M. ♩ = 40 to 84)", "above"),
+    ]
+    bars[-1].repeat_end = True
+    bars.append(
+        Bar(
+            [Event([P("C3"), P("Eb3")], 8, [], 2), Event([], 4, [], 1)],
+            [Event([P("C2"), P("Eb2")], 8, [], 2), Event([], 4, [], 2)],
+            final=True,
+        )
+    )
+    return bars
+
+
 def no50() -> Exercise:
-    bars = _legato_thirds()
+    bars = _legato_thirds() + _scale_in_thirds() + _chromatic_thirds()
     return Exercise(
         50,
         "Hanon n. 50",
@@ -387,6 +574,14 @@ def no50() -> Exercise:
             "Legato Thirds. We recommend careful study of this exercise, as Thirds occupy a "
             "very important place in difficult music. All notes must be struck evenly and very "
             "distinctly."
+        ),
+        notes=(
+            "Scales in Legato Thirds. It is indispensable to practise scales in legato thirds. "
+            "To obtain a smooth legato, keep the fifth finger of the right hand for an instant "
+            "on its note while the thumb and 3d finger are passing over to the next third; in "
+            "the left hand, the thumb is similarly held for an instant. Notes to be held are "
+            "indicated by half-notes. (1) Proceed similarly in the chromatic scale further on, "
+            "and in all scales in Thirds."
         ),
     )
 

@@ -61,6 +61,7 @@ class Event:
     fingers: list[int | None] = field(default_factory=list)  # low to high
     staff: int | None = None  # drawn on the other staff (cross-staff), as printed
     ottava: bool = False  # under an 8va line (the pitch stays as it sounds)
+    hollow: list[bool] = field(default_factory=list)  # low to high: a held note (open head)
 
 
 @dataclass
@@ -78,6 +79,7 @@ class Bar:
     )  # staff, offset, text, place
     dynamic: str = ""  # at the start of the bar, under the right hand
     beam: int = 8  # sixteenths under one beam
+    time: tuple[int, int] | None = None  # a new time signature from this bar
     rh2: list[Event] | None = None  # a second voice in a hand (notes held)
     lh2: list[Event] | None = None
 
@@ -226,7 +228,15 @@ ACCIDENTAL = {-1: "flat", 0: "natural", 1: "sharp"}
 
 
 def _note_xml(
-    p, ev: Event, staff: int, voice: int, chord: bool, beams: list[str], finger, shown: str = ""
+    p,
+    ev: Event,
+    staff: int,
+    voice: int,
+    chord: bool,
+    beams: list[str],
+    finger,
+    shown: str = "",
+    hollow: bool = False,
 ) -> str:
     parts = ["<note>"]
     if chord:
@@ -244,6 +254,9 @@ def _note_xml(
         parts.append(f"<accidental>{shown}</accidental>")
     if p is not None:
         parts.append(f"<stem>{'up' if voice in (1, 3) else 'down'}</stem>")
+    if hollow and ev.duration < 8:
+        # The page's sign for a note held a moment longer: an open head on a short note.
+        parts.append('<notehead filled="no">normal</notehead>')
     parts.append(f"<staff>{staff}</staff>")
     if not chord:
         for k, b in enumerate(beams, 1):
@@ -303,6 +316,7 @@ class _Writer:
         self.clef = {1: ex.clefs[0], 2: ex.clefs[1]}
         self.shift = {1: False, 3: False, 2: False, 4: False}  # per voice
         self.shift_staff = {1: 1, 2: 1, 3: 1, 4: 1}
+        self.time = (ex.beats, ex.beat_type)
 
     def clef_at(self, bar: Bar, staff: int, offset: int) -> str:
         sign = self.clef[staff]
@@ -353,7 +367,8 @@ class _Writer:
             for k, p in enumerate(pitches):
                 finger = ev.fingers[k] if k < len(ev.fingers) else None
                 shown = self.accidental(p, staffs[i]) if p is not None else ""
-                out.append(_note_xml(p, ev, staffs[i], voice, k > 0, beams[i], finger, shown))
+                held = k < len(ev.hollow) and ev.hollow[k]
+                out.append(_note_xml(p, ev, staffs[i], voice, k > 0, beams[i], finger, shown, held))
             t += ev.duration
         return "".join(out)
 
@@ -367,8 +382,11 @@ class _Writer:
 
     def measure(self, n: int, bar: Bar, last: bool) -> str:
         ex = self.ex
-        beat = 16 // ex.beat_type
-        measure_len = beat * ex.beats
+        if bar.time:
+            self.time = bar.time
+        beats, beat_type = self.time
+        beat = 16 // beat_type
+        measure_len = beat * beats
         xml = [f'<measure number="{n}">']
         self.altered: dict[tuple[int, str, int], int] = {}
         if bar.repeat_start:
@@ -380,9 +398,11 @@ class _Writer:
         if n == 1:
             attrs.append(
                 f"<divisions>4</divisions><key><fifths>{ex.fifths}</fifths></key>"
-                f"<time><beats>{ex.beats}</beats><beat-type>{ex.beat_type}</beat-type></time>"
+                f"<time><beats>{beats}</beats><beat-type>{beat_type}</beat-type></time>"
                 "<staves>2</staves>"
             )
+        elif bar.time:
+            attrs.append(f"<time><beats>{beats}</beats><beat-type>{beat_type}</beat-type></time>")
         starting = {st: sg for st, at, sg in bar.clefs if at == 0}
         for staff in (1, 2):
             sign = starting.get(staff, self.clef[staff])
