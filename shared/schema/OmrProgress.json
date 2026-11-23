@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "Payload of the ``omr.progress`` notification.",
+  "properties": {
+    "jobId": {
+      "type": "string"
+    },
+    "stage": {
+      "enum": [
+        "render",
+        "download",
+        "recognize",
+        "merge"
+      ],
+      "type": "string"
+    },
+    "page": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "total": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "jobId",
+    "stage",
+    "page",
+    "total"
+  ],
+  "title": "OmrProgress",
+  "type": "object"
+}

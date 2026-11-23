@@ -1,0 +1,24 @@
+.midi-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.midi-panel select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  max-width: 220px;
+}
+.midi-panel .follow.on {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: white;
+}
+.follow-summary {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

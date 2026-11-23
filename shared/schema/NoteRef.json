@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "A note found by position (never by ID): what the review screen sends to edit.",
+  "properties": {
+    "measure": {
+      "description": "Measure ordinal in the written score",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "staff": {
+      "description": "Global staff number: staves of all parts in order",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "offset": {
+      "description": "Onset in quarter notes from the downbeat",
+      "minimum": 0,
+      "type": "number"
+    },
+    "pitch": {
+      "description": "MIDI pitch",
+      "maximum": 127,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "measure",
+    "staff",
+    "offset",
+    "pitch"
+  ],
+  "title": "NoteRef",
+  "type": "object"
+}

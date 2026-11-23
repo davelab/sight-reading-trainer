@@ -1,6 +1,18 @@
+# Node / Vite
 node_modules/
-out/
-dist/
-.DS_Store
-*.local
+app/dist/
 *.tsbuildinfo
+*.local
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+engine/build/
+
+# Rust / Tauri (see also app/src-tauri/.gitignore)
+target/
+
+.DS_Store

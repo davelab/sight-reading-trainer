@@ -1,0 +1,130 @@
+.analysis-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome);
+  font-size: 0.9rem;
+}
+.analysis-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.key-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.key-chip .range,
+.analysis-status {
+  color: var(--text-secondary);
+}
+.analysis-status.error {
+  color: var(--danger);
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.analysis-switches {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.analysis-switches label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.fn-legend {
+  display: inline-flex;
+  gap: 6px;
+  font-family: 'Times New Roman', Times, serif;
+  font-weight: 700;
+  font-style: normal;
+}
+.fn-legend i {
+  font-style: normal;
+}
+.fn-legend .fn-tonic {
+  color: var(--fn-tonic);
+}
+.fn-legend .fn-predominant {
+  color: var(--fn-predominant);
+}
+.fn-legend .fn-dominant {
+  color: var(--fn-dominant);
+}
+.pattern-list {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.pattern-summary {
+  color: var(--text-secondary);
+}
+.pattern-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.pattern-chip.selected {
+  border-color: var(--pattern);
+  box-shadow: 0 0 0 1px var(--pattern);
+}
+.pattern-chip .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--pattern);
+}
+.pattern-chip strong {
+  color: var(--pattern);
+}
+.pattern-meta {
+  color: var(--text-secondary);
+}
+.pattern-chip button {
+  padding: 0 7px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.pattern-chip button.looped {
+  background: var(--pattern);
+  border-color: var(--pattern);
+  color: white;
+}
+.analysis-keys,
+.pattern-list {
+  align-items: center;
+}
+.analysis-label {
+  font-weight: 700;
+  margin-right: 2px;
+}
+.analysis-more {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.key-chip {
+  cursor: pointer;
+}
+.key-chip.current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.collapse-toggle {
+  padding: 0 6px;
+  min-width: 26px;
+  font-size: 13px;
+}

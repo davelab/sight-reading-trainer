@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "description": "Payload of ``separate.done``: the piano alone and the song without it.",
+  "properties": {
+    "jobId": {
+      "type": "string"
+    },
+    "model": {
+      "enum": [
+        "fast",
+        "quality"
+      ],
+      "type": "string"
+    },
+    "pianoPath": {
+      "description": "WAV with the piano alone",
+      "type": "string"
+    },
+    "restPath": {
+      "description": "WAV with the song minus the piano",
+      "type": "string"
+    },
+    "duration": {
+      "description": "Seconds of audio",
+      "type": "number"
+    }
+  },
+  "required": [
+    "jobId",
+    "model",
+    "pianoPath",
+    "restPath",
+    "duration"
+  ],
+  "title": "SeparateResult",
+  "type": "object"
+}

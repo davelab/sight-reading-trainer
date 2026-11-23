@@ -1,0 +1,50 @@
+{
+  "$defs": {
+    "PartInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "staves": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "staves"
+      ],
+      "title": "PartInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of ``score.normalize``.",
+  "properties": {
+    "musicxml": {
+      "type": "string"
+    },
+    "measures": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "parts": {
+      "items": {
+        "$ref": "#/$defs/PartInfo"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "musicxml",
+    "measures",
+    "parts"
+  ],
+  "title": "NormalizeResult",
+  "type": "object"
+}

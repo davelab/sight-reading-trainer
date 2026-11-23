@@ -1,0 +1,171 @@
+:root {
+  --bg: #f6f5f2;
+  --chrome: #ecebe7;
+  --paper-bg: #e4e2dd;
+  --paper: #ffffff;
+  --text: #1d1d1b;
+  --text-secondary: #6b6a66;
+  --border: #cfcdc7;
+  --accent: #3a64d8;
+  --cursor: #e0a800;
+  /* Hands: notes to play on the keyboard and the score cursor. */
+  --hand-right: #e0a800;
+  --hand-left: #8e5bd6;
+  --ok: #2e9b57;
+  /* Harmonic functions, on the white score page in both themes. */
+  --fn-tonic: #1f5fbf;
+  --fn-predominant: #2a8a3e;
+  --fn-dominant: #c2410c;
+  --err: #d23c2f;
+  --danger-bg: #fbe3e1;
+  --danger: #a3261b;
+  --falling-bg: #f4f1ea;
+  --falling-line: rgba(0, 0, 0, 0.08);
+  color-scheme: light dark;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1e;
+    --chrome: #26262a;
+    --paper-bg: #141416;
+    --paper: #f4f2ec;
+    --text: #ececea;
+    --text-secondary: #a3a29d;
+    --border: #3b3b40;
+    --accent: #6a8cff;
+    --ok: #3fb56c;
+    --err: #ef5a4c;
+    --danger-bg: #4a1f1b;
+    --danger: #ffb4ab;
+    --falling-bg: #19191c;
+    --falling-line: rgba(255, 255, 255, 0.08);
+  }
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+p {
+  margin: 0;
+}
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome);
+}
+.toolbar .title {
+  flex: 1;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.zoom {
+  min-width: 44px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  font-size: 1.5rem;
+  background: rgb(58 100 216 / 0.15);
+  border: 3px dashed var(--accent);
+  pointer-events: none;
+}
+.main.view-both {
+  flex-direction: column;
+}
+.main.view-both > .score-view {
+  flex: 1 1 50%;
+  min-height: 0;
+}
+.falling-pane {
+  flex: 1 1 50%;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+.main.view-falling .falling-pane {
+  flex: 1;
+}
+.segmented {
+  gap: 0;
+}
+.segmented button {
+  border-radius: 0;
+}
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.segmented button + button {
+  border-left: none;
+}
+.segmented .selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.toolbar button.unsaved {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.toolbar .sections button {
+  font-weight: 600;
+}

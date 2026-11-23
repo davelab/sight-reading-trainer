@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "SeparationModelInfo": {
+      "additionalProperties": false,
+      "description": "One of the piano separation models and whether it is downloaded.",
+      "properties": {
+        "id": {
+          "enum": [
+            "fast",
+            "quality"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "description": "Download size",
+          "type": "integer"
+        },
+        "installed": {
+          "type": "boolean"
+        },
+        "licence": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "sizeBytes",
+        "installed",
+        "licence"
+      ],
+      "title": "SeparationModelInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of ``separate.models``.",
+  "properties": {
+    "models": {
+      "items": {
+        "$ref": "#/$defs/SeparationModelInfo"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "models"
+  ],
+  "title": "SeparationModels",
+  "type": "object"
+}

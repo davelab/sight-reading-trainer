@@ -1,0 +1,68 @@
+.technique {
+  align-items: stretch;
+  gap: 14px;
+}
+.technique-intro,
+.technique-source {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.technique h3 {
+  margin: 4px 0 8px;
+  font-size: 14px;
+}
+.technique-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.technique-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--paper-bg);
+}
+.technique-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.technique-card header span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.technique-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.technique-preview {
+  min-height: 70px;
+  overflow: hidden;
+  background: white;
+  border-radius: 6px;
+}
+.technique-preview svg {
+  width: 100%;
+  height: auto;
+}
+.technique-card button {
+  align-self: flex-start;
+}
+.technique-book {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.technique-book summary {
+  cursor: pointer;
+}
+.technique-book p {
+  margin: 4px 0 0;
+  font-style: italic;
+}

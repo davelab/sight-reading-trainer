@@ -1,0 +1,6 @@
+/target/
+/gen/schemas
+/resources/*.sf2
+/resources/*.onnx
+/binaries/engine-*
+/binaries/omr-*

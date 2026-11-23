@@ -1,0 +1,86 @@
+[
+  {
+    "number": 1,
+    "title": "Hanon n. 1",
+    "description": "Estensione tra 4° e 5° dito; indipendenza e uniformità di 3, 4, 5.",
+    "tempo": "(M.M. ♩ = 60 to 108.)",
+    "bpm": 60,
+    "file": "hanon-01.musicxml",
+    "measures": 30,
+    "page": "1",
+    "heading": "Part I. Preparatory Exercises for the Acquirement of Agility, Independence, Strength and Perfect Evenness in the Fingers. — No. 1. Stretch between the fifth and fourth fingers of the left hand in ascending, and the fifth and fourth fingers of the right hand in descending. For studying the 20 exercises in this First Part, begin with the metronome set at 60, gradually increasing the speed up to 108; this is the meaning of the double metronome-mark at the head of each exercise. Lift the fingers high and with precision, playing each note very distinctly.",
+    "notes": "(1) For brevity, we shall henceforward indicate only by their figures those fingers which are to be specially trained in each exercise; e.g., 3-4 in No 2; 2-3-4 in No 3, etc. Observe that, throughout the book, both hands are continually executing the same difficulties; in this way the left hand becomes as skilful as the right. Besides, the difficulties executed by the left hand in ascending, are exactly copied by the same fingers of the right hand in descending; this new style of exercise will cause the hands to acquire perfect equality."
+  },
+  {
+    "number": 2,
+    "title": "Hanon n. 2",
+    "description": "Rafforza 3° e 4° dito; posizione estesa con il 5°.",
+    "tempo": "♩ = 60–108",
+    "bpm": 60,
+    "file": "hanon-02.musicxml",
+    "measures": 29,
+    "page": "2",
+    "heading": "(3-4) When this exercise is mastered, recommence the preceding one, and play both together four times without interruption; the fingers will gain considerably by practising these exercises, and those following, in this way.",
+    "notes": "(1) The fourth and fifth fingers being naturally weak, it should be observed that this exercise, and those following it up to No 31, are intended to render them as strong and agile as the second and third."
+  },
+  {
+    "number": 13,
+    "title": "Hanon n. 13",
+    "description": "Esercizio per 3°, 4° e 5° dito, a note alternate.",
+    "tempo": "♩ = 60–108",
+    "bpm": 60,
+    "file": "hanon-13.musicxml",
+    "measures": 29,
+    "page": "13",
+    "heading": "(3-4-5)",
+    "notes": ""
+  },
+  {
+    "number": 20,
+    "title": "Hanon n. 20",
+    "description": "Estensione 2-4 e 4-5; esercizio per 2°, 3°, 4° dito su un arpeggio largo.",
+    "tempo": "♩ = 60–108",
+    "bpm": 60,
+    "file": "hanon-20.musicxml",
+    "measures": 31,
+    "page": "20",
+    "heading": "Extension of 2-4, 4-5, and exercise for 2-3-4.",
+    "notes": "End of Part I. After having mastered this First Part, play it through once or twice daily for some time before commencing the study of the Second (\"transcendent\") Part; by so doing, one is sure to obtain every possible advantage that this work promises. Complete mastery of Part I gives the key to the difficulties found in Part II."
+  },
+  {
+    "number": 43,
+    "title": "Hanon n. 43",
+    "description": "Arpeggi sugli accordi di settima di dominante: estensione delle dita e forma della mano.",
+    "tempo": "♩ = 60–120",
+    "bpm": 60,
+    "file": "hanon-43.musicxml",
+    "measures": 33,
+    "page": "69–70",
+    "heading": "Extension of the fingers in chords of the dominant seventh, in arpeggios.",
+    "notes": "End of Part II. Parts I and II of this work being the key to the difficulties in Part III, it is evidently very important that they should be thoroughly mastered before commencing the virtuoso studies contained in Part III."
+  },
+  {
+    "number": 48,
+    "title": "Hanon n. 48",
+    "description": "Esercizio di polso: terze e seste staccate, il braccio fermo e il polso morbido.",
+    "tempo": "♩ = 40–84",
+    "bpm": 40,
+    "file": "hanon-48.musicxml",
+    "measures": 25,
+    "page": "78–79",
+    "heading": "Wrist-exercise. Detached Thirds and Sixths. Lift the wrists well after each stroke, holding the arms perfectly quiet; the wrist should be supple, and the fingers firm without stiffness. Practise the first four measures until an easy wrist-movement is obtained; then take up the rest of the exercise.",
+    "notes": ""
+  },
+  {
+    "number": 50,
+    "title": "Hanon n. 50",
+    "description": "Terze legate: ogni nota uguale e ben distinta; poi le scale in terze e le terze minori cromatiche.",
+    "tempo": "♩ = 40–84",
+    "bpm": 40,
+    "file": "hanon-50.musicxml",
+    "measures": 25,
+    "page": "81–82",
+    "heading": "Legato Thirds. We recommend careful study of this exercise, as Thirds occupy a very important place in difficult music. All notes must be struck evenly and very distinctly.",
+    "notes": "Scales in Legato Thirds. It is indispensable to practise scales in legato thirds. To obtain a smooth legato, keep the fifth finger of the right hand for an instant on its note while the thumb and 3d finger are passing over to the next third; in the left hand, the thumb is similarly held for an instant. Notes to be held are indicated by half-notes. (1) Proceed similarly in the chromatic scale further on, and in all scales in Thirds."
+  }
+]

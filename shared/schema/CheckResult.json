@@ -1,0 +1,107 @@
+{
+  "$defs": {
+    "NoteRef": {
+      "additionalProperties": false,
+      "description": "A note found by position (never by ID): what the review screen sends to edit.",
+      "properties": {
+        "measure": {
+          "description": "Measure ordinal in the written score",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "staff": {
+          "description": "Global staff number: staves of all parts in order",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "description": "Onset in quarter notes from the downbeat",
+          "minimum": 0,
+          "type": "number"
+        },
+        "pitch": {
+          "description": "MIDI pitch",
+          "maximum": 127,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "measure",
+        "staff",
+        "offset",
+        "pitch"
+      ],
+      "title": "NoteRef",
+      "type": "object"
+    },
+    "OmrWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "measure": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "staff": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "duration",
+            "page"
+          ],
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "measure",
+        "kind",
+        "message"
+      ],
+      "title": "OmrWarning",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result of ``score.check`` and ``score.edit``.",
+  "properties": {
+    "musicxml": {
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/OmrWarning"
+      },
+      "type": "array"
+    },
+    "note": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NoteRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "score.edit: where the edited (or inserted) note is now"
+    }
+  },
+  "required": [
+    "musicxml",
+    "warnings"
+  ],
+  "title": "CheckResult",
+  "type": "object"
+}

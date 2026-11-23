@@ -1,0 +1,13 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "title": "PingResult",
+  "type": "object"
+}
