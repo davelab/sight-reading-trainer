@@ -17,6 +17,8 @@ interface HanonExercise {
   file: string
   measures: number
   page: string
+  heading: string
+  notes: string
 }
 
 const ALL = exercises as HanonExercise[]
@@ -90,6 +92,13 @@ export function TechniqueDrill() {
                     </span>
                   </header>
                   <p>{ex.description}</p>
+                  {(ex.heading || ex.notes) && (
+                    <details className="technique-book">
+                      <summary>Dal libro</summary>
+                      {ex.heading && <p>{ex.heading}</p>}
+                      {ex.notes && <p>{ex.notes}</p>}
+                    </details>
+                  )}
                   {previews[n] ? (
                     <Snippet xml={previews[n]} className="technique-preview" scale={30} />
                   ) : (
@@ -105,8 +114,8 @@ export function TechniqueDrill() {
         </section>
       ))}
       <small className="technique-source">
-        Dall'edizione Schirmer (1900), di pubblico dominio; trascritti in MusicXML con le diteggiature della prima
-        battuta in salita e in discesa.
+        Dall'edizione Schirmer (1900), di pubblico dominio: copia in MusicXML di note, diteggiature, chiavi, 8va e
+        indicazioni del libro.
       </small>
     </div>
   )

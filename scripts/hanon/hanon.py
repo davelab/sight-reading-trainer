@@ -58,7 +58,9 @@ def diatonic(index: int) -> Pitch:
 class Event:
     pitches: list[Pitch]  # empty: a rest
     duration: int  # in divisions (4 per quarter: a sixteenth is 1)
-    fingers: list[int] = field(default_factory=list)  # one per pitch, low to high, or none
+    fingers: list[int | None] = field(default_factory=list)  # low to high
+    staff: int | None = None  # drawn on the other staff (cross-staff), as printed
+    ottava: bool = False  # under an 8va line (the pitch stays as it sounds)
 
 
 @dataclass
@@ -67,9 +69,17 @@ class Bar:
     lh: list[Event]
     repeat_end: bool = False
     final: bool = False
-    text: str = ""  # a direction above the bar ("4 volte")
+    text: str = ""  # words above the bar
     repeat_start: bool = False
-    times: int = 0  # repeat count shown at a repeat end ("4 volte")
+    times: int = 0  # repeat count at a repeat end
+    clefs: list[tuple[int, int, str]] = field(default_factory=list)  # (staff, offset, sign)
+    words: list[tuple[int, int, str, str]] = field(
+        default_factory=list
+    )  # staff, offset, text, place
+    dynamic: str = ""  # at the start of the bar, under the right hand
+    beam: int = 8  # sixteenths under one beam
+    rh2: list[Event] | None = None  # a second voice in a hand (notes held)
+    lh2: list[Event] | None = None
 
 
 @dataclass
@@ -84,6 +94,11 @@ class Exercise:
     pages: str
     bpm: int = 60
     fifths: int = 0
+    heading: str = ""  # the book's own words over the exercise
+    notes: str = ""  # its footnotes and remarks
+    auto_staff: tuple[int, ...] = ()  # hands (home staff) whose notes go where fewer ledgers
+    clefs: tuple[str, str] = ("G", "F")  # at the start
+    tempo_words: str = ""  # the metronome mark as the page prints it
 
 
 def sixteenths(pitches: list[Pitch], fingers: list[int | None] | None = None) -> list[Event]:
@@ -95,29 +110,35 @@ def sixteenths(pitches: list[Pitch], fingers: list[int | None] | None = None) ->
     return out
 
 
-def sequence(
-    start: Pitch,
-    pattern: list[int],
-    bars: int,
-    step: int,
-    rh_fingers: list[int | None] | None = None,
-    lh_fingers: list[int | None] | None = None,
-) -> list[Bar]:
+def sequence(start: Pitch, pattern: list[int], bars: int, step: int) -> list[Bar]:
     """Part I: the pattern from `start` (right hand; the left an octave lower),
-    moved one scale step per bar (`step` +1 up, -1 down). Fingering on the
-    first bar only, as printed."""
+    moved one scale step per bar (`step` +1 up, -1 down)."""
     out = []
     for b in range(bars):
         base = start.index + b * step
         rh = [diatonic(base + d) for d in pattern]
         lh = [diatonic(base + d - 7) for d in pattern]
-        out.append(
-            Bar(
-                sixteenths(rh, rh_fingers if b == 0 else None),
-                sixteenths(lh, lh_fingers if b == 0 else None),
-            )
-        )
+        out.append(Bar(sixteenths(rh), sixteenths(lh)))
     return out
+
+
+def _apply_layout(bars: list[Bar], number: int) -> None:
+    """Staves, fingering and words of each bar as the page prints them."""
+    from hanon_layout import ALL1, ALL2, NONE, PART_ONE, per_bar  # noqa: PLC0415
+
+    spec = PART_ONE[number]
+    total = spec["bars"]
+    rh_staff = per_bar(total, spec["rh_staff"], ALL1)
+    lh_staff = per_bar(total, spec["lh_staff"], ALL2)
+    rh_f = per_bar(total, spec["rh_f"], NONE)
+    lh_f = per_bar(total, spec["lh_f"], NONE)
+    for n, bar in enumerate(bars[:total], 1):
+        for events, staffs, fingers in ((bar.rh, rh_staff, rh_f), (bar.lh, lh_staff, lh_f)):
+            for ev, st, f in zip(events, staffs[n - 1], fingers[n - 1], strict=True):
+                ev.staff = int(st)
+                ev.fingers = [int(f)] if f != "." else []
+        bar.text = spec["words"].get(n, "")
+        bar.dynamic = spec["dynamic"].get(n, "")
 
 
 def part_one(
@@ -129,77 +150,63 @@ def part_one(
     desc: list[int],
     desc_start: str,
     desc_bars: int,
-    fingers: dict[str, list[int | None]],
     final_rh: list[str],
     final_lh: list[str],
     page: int,
+    final_rh_staff: int = 2,
 ) -> Exercise:
-    bars = sequence(P(asc_start), asc, asc_bars, 1, fingers.get("asc_rh"), fingers.get("asc_lh"))
-    down = sequence(
-        P(desc_start), desc, desc_bars, -1, fingers.get("desc_rh"), fingers.get("desc_lh")
-    )
-    down[0].text = "discendendo"
-    bars[0].text = "ascendendo"
-    bars += down
+    from hanon_layout import HEADINGS, NOTES, PART_ONE  # noqa: PLC0415
+
+    bars = sequence(P(asc_start), asc, asc_bars, 1) + sequence(P(desc_start), desc, desc_bars, -1)
+    _apply_layout(bars, number)
     bars[-1].repeat_end = True
-    bars.append(
-        Bar(
-            [Event([P(n) for n in final_rh], 8)],
-            [Event([P(n) for n in final_lh], 8)],
-            final=True,
-        )
+    spec = PART_ONE[number]
+    final = Bar(
+        [Event([P(n) for n in final_rh], 8, staff=final_rh_staff)],
+        [Event([P(n) for n in final_lh], 8, staff=2)],
+        final=True,
     )
+    if spec["final_words"]:
+        final.words.append((1, 0, spec["final_words"], "above"))
+    bars.append(final)
     return Exercise(
         number,
         f"Hanon n. {number}",
         description,
-        "♩ = 60–108",
+        spec["tempo"] or "♩ = 60–108",
         2,
         4,
         bars,
         str(page),
+        heading=HEADINGS.get(number, ""),
+        notes=NOTES.get(number, ""),
+        tempo_words=spec["tempo"],
     )
 
 
 # --- writing -------------------------------------------------------------------
 
 CLEF = {"G": ("G", 2), "F": ("F", 4)}
-
-
 STAFF_RANGE = {"G": (P("E4").index, P("F5").index), "F": (P("G2").index, P("A3").index)}
-OTTAVA_FROM = P("A5").midi  # a right-hand beat entirely this high is printed 8va
+TYPES = {
+    1: "16th",
+    2: "eighth",
+    3: "eighth",
+    4: "quarter",
+    6: "quarter",
+    8: "half",
+    12: "half",
+    16: "whole",
+}
 
 
-def _ledgers(events: list[Event], clef: str, ottava: bool = False) -> int:
+def _ledgers(pitches: list[Pitch], clef: str, ottava: bool = False) -> int:
     low, high = STAFF_RANGE[clef]
     total = 0
-    for e in events:
-        for p in e.pitches:
-            i = p.index - (7 if ottava else 0)
-            total += max(0, (low - i) // 2, (i - high) // 2)
+    for p in pitches:
+        i = p.index - (7 if ottava else 0)
+        total += max(0, (low - i) // 2, (i - high) // 2)
     return total
-
-
-def _clef_for(events: list[Event], current: str) -> str:
-    """The clef that needs fewer ledger lines, keeping the current one unless the
-    other is clearly better (no clef flipping back and forth)."""
-    other = "F" if current == "G" else "G"
-    return other if _ledgers(events, other) + 2 < _ledgers(events, current) else current
-
-
-def _clefs_by_beat(events: list[Event], current: str, beat: int) -> list[str]:
-    """The clef for each beat of a bar (a hand may change clef mid-bar, as the
-    printed page does when a scale runs across middle C)."""
-    out, t, i = [], 0, 0
-    while i < len(events):
-        group = []
-        while i < len(events) and t // beat == len(out):
-            group.append(events[i])
-            t += events[i].duration
-            i += 1
-        current = _clef_for(group, current)
-        out.append(current)
-    return out
 
 
 def _clef_xml(staff: int, sign: str) -> str:
@@ -208,7 +215,19 @@ def _clef_xml(staff: int, sign: str) -> str:
     return f"<attributes>{clef}</attributes>"
 
 
-def _note_xml(p: Pitch | None, ev: Event, staff: int, voice: int, chord: bool, beam: str, finger):
+def _direction(staff: int, body: str, place: str = "above", extra: str = "") -> str:
+    return (
+        f'<direction placement="{place}"><direction-type>{body}</direction-type>'
+        f"<staff>{staff}</staff>{extra}</direction>"
+    )
+
+
+ACCIDENTAL = {-1: "flat", 0: "natural", 1: "sharp"}
+
+
+def _note_xml(
+    p, ev: Event, staff: int, voice: int, chord: bool, beams: list[str], finger, shown: str = ""
+) -> str:
     parts = ["<note>"]
     if chord:
         parts.append("<chord/>")
@@ -218,124 +237,145 @@ def _note_xml(p: Pitch | None, ev: Event, staff: int, voice: int, chord: bool, b
         alter = f"<alter>{p.alter}</alter>" if p.alter else ""
         parts.append(f"<pitch><step>{p.step}</step>{alter}<octave>{p.octave}</octave></pitch>")
     parts.append(f"<duration>{ev.duration}</duration><voice>{voice}</voice>")
-    kind = {
-        1: "16th",
-        2: "eighth",
-        3: "eighth",
-        4: "quarter",
-        6: "quarter",
-        8: "half",
-        12: "half",
-        16: "whole",
-    }[ev.duration]
-    parts.append(f"<type>{kind}</type>")
+    parts.append(f"<type>{TYPES[ev.duration]}</type>")
     if ev.duration in (3, 6, 12):
         parts.append("<dot/>")
-    if p is not None and p.alter:
-        parts.append(f"<accidental>{'sharp' if p.alter > 0 else 'flat'}</accidental>")
-    parts.append(f"<stem>{'up' if voice == 1 else 'down'}</stem>")
+    if shown:
+        parts.append(f"<accidental>{shown}</accidental>")
+    if p is not None:
+        parts.append(f"<stem>{'up' if voice in (1, 3) else 'down'}</stem>")
     parts.append(f"<staff>{staff}</staff>")
-    if beam and not chord:
-        parts.append(f'<beam number="1">{beam}</beam>')
-        if ev.duration == 1:
-            parts.append(f'<beam number="2">{beam}</beam>')
+    if not chord:
+        for k, b in enumerate(beams, 1):
+            if b:
+                parts.append(f'<beam number="{k}">{b}</beam>')
     if finger:
+        place = "above" if voice in (1, 3) else "below"
         parts.append(
             "<notations><technical>"
-            f'<fingering placement="{"above" if voice == 1 else "below"}">{finger}</fingering>'
+            f'<fingering placement="{place}">{finger}</fingering>'
             "</technical></notations>"
         )
     parts.append("</note>")
     return "".join(parts)
 
 
-def _ottava_beats(events: list[Event], beat: int) -> list[bool]:
-    """Beats of the right hand printed 8va: every note from A5 up."""
-    out, t = [], 0
-    groups: dict[int, list[int]] = {}
-    for e in events:
-        groups.setdefault(t // beat, []).extend(p.midi for p in e.pitches)
-        t += e.duration
-    for b in range(max(groups) + 1 if groups else 0):
-        notes = groups.get(b, [])
-        out.append(bool(notes) and min(notes) >= OTTAVA_FROM)
-    # A bracket over a single beat helps no one: at least two beats in a row.
-    return [
-        on and ((i > 0 and out[i - 1]) or (i + 1 < len(out) and out[i + 1]))
-        for i, on in enumerate(out)
-    ]
+def _beams(events: list[Event], group: int) -> list[list[str]]:
+    """Primary beam over `group` sixteenths (as printed: eight), the second
+    beam broken every four."""
+    out: list[list[str]] = [[] for _ in events]
+    run: list[int] = []
+
+    def flush() -> None:
+        for start in range(0, len(run), group):
+            chunk = run[start : start + group]
+            if len(chunk) < 2:
+                continue
+            for k, i in enumerate(chunk):
+                first = "begin" if k == 0 else "end" if k == len(chunk) - 1 else "continue"
+                sub = k % 4
+                second = (
+                    "begin"
+                    if sub == 0
+                    else "end"
+                    if sub == 3 or k == len(chunk) - 1
+                    else "continue"
+                )
+                if sub == 0 and k == len(chunk) - 1:
+                    second = "backward hook"
+                out[i] = [first, second if events[i].duration == 1 else ""]
+        run.clear()
+
+    for i, e in enumerate(events):
+        if e.duration == 1 and e.pitches:
+            run.append(i)
+        else:
+            flush()
+    flush()
+    return out
 
 
-def _shift(kind: str) -> str:
-    return (
-        '<direction placement="above"><direction-type>'
-        f'<octave-shift type="{kind}" size="8"/></direction-type><staff>1</staff></direction>'
-    )
+class _Writer:
+    """Writes the bars, keeping what runs across bar lines: clefs, 8va lines."""
 
+    def __init__(self, ex: Exercise) -> None:
+        self.ex = ex
+        self.clef = {1: ex.clefs[0], 2: ex.clefs[1]}
+        self.shift = {1: False, 3: False, 2: False, 4: False}  # per voice
+        self.shift_staff = {1: 1, 2: 1, 3: 1, 4: 1}
 
-def _voice_xml(
-    events: list[Event],
-    staff: int,
-    voice: int,
-    beat: int,
-    clefs: list[str] | None = None,
-    ottava: list[bool] | None = None,
-) -> str:
-    """One hand's bar; `clefs` (one per beat) puts clef changes inside the bar,
-    `ottava` (one per beat) the 8va brackets (pitches stay as they sound)."""
-    out = []
-    t = 0
-    shifted = False
-    for i, ev in enumerate(events):
-        b = t // beat
-        if clefs and t % beat == 0 and b > 0 and clefs[b] != clefs[b - 1]:
-            out.append(_clef_xml(staff, clefs[b]))
-        if ottava and t % beat == 0:
-            if ottava[b] and not shifted:
-                out.append(_shift("down"))
-                shifted = True
-            elif not ottava[b] and shifted:
-                out.append(_shift("stop"))
-                shifted = False
-        beam = ""
-        if ev.duration < 4 and ev.pitches:
-            group = t // beat
-            mates = [
-                j
-                for j, e in enumerate(events)
-                if e.duration < 4
-                and e.pitches
-                and sum(x.duration for x in events[:j]) // beat == group
-            ]
-            if len(mates) > 1:
-                beam = "begin" if i == mates[0] else "end" if i == mates[-1] else "continue"
-        pitches = sorted(ev.pitches, key=lambda p: p.midi) or [None]
-        for k, p in enumerate(pitches):
-            finger = ev.fingers[k] if k < len(ev.fingers) else None
-            out.append(_note_xml(p, ev, staff, voice, k > 0, beam, finger))
-        t += ev.duration
-    if shifted:
-        out.append(_shift("stop"))
-    return "".join(out)
+    def clef_at(self, bar: Bar, staff: int, offset: int) -> str:
+        sign = self.clef[staff]
+        for st, at, sg in sorted(bar.clefs, key=lambda c: c[1]):
+            if st == staff and at <= offset:
+                sign = sg
+        return sign
 
+    def staff_of(self, bar: Bar, ev: Event, home: int, offset: int) -> int:
+        if ev.staff:
+            return ev.staff
+        if home not in self.ex.auto_staff or not ev.pitches:
+            return home
+        here = _ledgers(ev.pitches, self.clef_at(bar, home, offset), ev.ottava)
+        other = 2 if home == 1 else 1
+        there = _ledgers(ev.pitches, self.clef_at(bar, other, offset), ev.ottava)
+        return other if there + 1 < here else home
 
-def to_musicxml(ex: Exercise) -> str:
-    beat = 16 // ex.beat_type  # divisions per beat
-    measure_len = beat * ex.beats
-    clefs = {1: "G", 2: "F"}
-    measures = []
-    for n, bar in enumerate(ex.bars, 1):
+    def accidental(self, p: Pitch, staff: int) -> str:
+        """Shown when the note differs from what the bar (or key) has made it."""
+        key = (staff, p.step, p.octave)
+        now = self.altered.get(key, 0)
+        self.altered[key] = p.alter
+        return ACCIDENTAL[p.alter] if p.alter != now else ""
+
+    def voice(self, bar: Bar, events: list[Event], voice: int, home: int, extras: dict) -> str:
+        out = []
+        t = 0
+        beams = _beams(events, bar.beam)
+        # A beat goes on one staff (the whole group of four, as the page does).
+        staffs = [
+            self.staff_of(bar, e, home, sum(x.duration for x in events[:i]))
+            for i, e in enumerate(events)
+        ]
+        for i, ev in enumerate(events):
+            for item in extras.get(t, []):
+                out.append(item)
+            if ev.ottava and not self.shift[voice]:
+                staff = staffs[i]
+                out.append(_direction(staff, '<octave-shift type="down" size="8"/>'))
+                self.shift[voice], self.shift_staff[voice] = True, staff
+            elif not ev.ottava and self.shift[voice] and ev.pitches:
+                out.append(
+                    _direction(self.shift_staff[voice], '<octave-shift type="stop" size="8"/>')
+                )
+                self.shift[voice] = False
+            pitches = sorted(ev.pitches, key=lambda p: p.midi) or [None]
+            for k, p in enumerate(pitches):
+                finger = ev.fingers[k] if k < len(ev.fingers) else None
+                shown = self.accidental(p, staffs[i]) if p is not None else ""
+                out.append(_note_xml(p, ev, staffs[i], voice, k > 0, beams[i], finger, shown))
+            t += ev.duration
+        return "".join(out)
+
+    def close_shifts(self) -> str:
+        out = []
+        for v, on in self.shift.items():
+            if on:
+                out.append(_direction(self.shift_staff[v], '<octave-shift type="stop" size="8"/>'))
+                self.shift[v] = False
+        return "".join(out)
+
+    def measure(self, n: int, bar: Bar, last: bool) -> str:
+        ex = self.ex
+        beat = 16 // ex.beat_type
+        measure_len = beat * ex.beats
         xml = [f'<measure number="{n}">']
+        self.altered: dict[tuple[int, str, int], int] = {}
         if bar.repeat_start:
             xml.append(
                 '<barline location="left"><bar-style>heavy-light</bar-style>'
                 '<repeat direction="forward"/></barline>'
             )
-        by_beat = {
-            1: _clefs_by_beat(bar.rh, clefs[1], beat),
-            2: _clefs_by_beat(bar.lh, clefs[2], beat),
-        }
-        wanted = {1: by_beat[1][0], 2: by_beat[2][0]}
         attrs = []
         if n == 1:
             attrs.append(
@@ -343,38 +383,55 @@ def to_musicxml(ex: Exercise) -> str:
                 f"<time><beats>{ex.beats}</beats><beat-type>{ex.beat_type}</beat-type></time>"
                 "<staves>2</staves>"
             )
+        starting = {st: sg for st, at, sg in bar.clefs if at == 0}
         for staff in (1, 2):
-            if n == 1 or wanted[staff] != clefs[staff]:
-                sign, line = CLEF[wanted[staff]]
-                attrs.append(
-                    f'<clef number="{staff}"><sign>{sign}</sign><line>{line}</line></clef>'
-                )
-        for staff in (1, 2):
-            clefs[staff] = by_beat[staff][-1]
+            sign = starting.get(staff, self.clef[staff])
+            if n == 1 or sign != self.clef[staff]:
+                s, line = CLEF[sign]
+                attrs.append(f'<clef number="{staff}"><sign>{s}</sign><line>{line}</line></clef>')
         if attrs:
             xml.append("<attributes>" + "".join(attrs) + "</attributes>")
         if n == 1:
-            xml.append(
-                '<direction placement="above"><direction-type><metronome>'
-                "<beat-unit>quarter</beat-unit>"
-                f"<per-minute>{ex.bpm}</per-minute></metronome></direction-type>"
-                f'<staff>1</staff><sound tempo="{ex.bpm}"/></direction>'
+            # The page's own metronome words; the tempo the app plays at.
+            body = (
+                f"<words>{escape(ex.tempo_words)}</words>"
+                if ex.tempo_words
+                else '<words print-object="no"> </words>'
             )
+            xml.append(_direction(1, body, extra=f'<sound tempo="{ex.bpm}"/>'))
         if bar.text:
-            xml.append(
-                '<direction placement="above"><direction-type>'
-                f'<words font-style="italic">{escape(bar.text)}</words></direction-type>'
-                "<staff>1</staff></direction>"
+            xml.append(_direction(1, f'<words font-style="italic">{escape(bar.text)}</words>'))
+        if bar.dynamic:
+            xml.append(_direction(1, f"<dynamics><{bar.dynamic}/></dynamics>", "below"))
+        # Things placed inside the bar: clef changes and words, by time offset.
+        extras: dict[int, dict[int, list[str]]] = {1: {}, 2: {}}
+        for staff, at, sign in bar.clefs:
+            if at > 0:
+                extras[staff].setdefault(at, []).append(_clef_xml(staff, sign))
+        for staff, at, text, place in bar.words:
+            extras[staff].setdefault(at, []).append(
+                _direction(staff, f'<words font-style="italic">{escape(text)}</words>', place)
             )
-        for hand, events in ((1, bar.rh), (2, bar.lh)):
+        voices = [(1, 1, bar.rh), (3, 1, bar.rh2), (2, 2, bar.lh), (4, 2, bar.lh2)]
+        first = True
+        for voice, home, events in voices:
+            if events is None:
+                continue
             total = sum(e.duration for e in events)
             if total != measure_len:
-                raise ValueError(f"n. {ex.number}, bar {n}, hand {hand}: {total} != {measure_len}")
-            if hand == 2:
+                raise ValueError(
+                    f"n. {ex.number}, bar {n}, voice {voice}: {total} != {measure_len}"
+                )
+            if not first:
                 xml.append(f"<backup><duration>{measure_len}</duration></backup>")
-            # MusicXML keeps the sounding pitch; an 8va is only how it is printed.
-            ottava = _ottava_beats(events, beat) if hand == 1 else None
-            xml.append(_voice_xml(events, hand, hand, beat, by_beat[hand], ottava))
+            first = False
+            xml.append(
+                self.voice(bar, events, voice, home, extras[home] if voice in (1, 2) else {})
+            )
+        for staff in {c[0] for c in bar.clefs}:
+            self.clef[staff] = self.clef_at(bar, staff, measure_len)
+        if last:
+            xml.append(self.close_shifts())
         if bar.final:
             xml.append('<barline location="right"><bar-style>light-heavy</bar-style></barline>')
         elif bar.repeat_end:
@@ -384,7 +441,12 @@ def to_musicxml(ex: Exercise) -> str:
                 f'<repeat direction="backward"{extra}/></barline>'
             )
         xml.append("</measure>")
-        measures.append("".join(xml))
+        return "".join(xml)
+
+
+def to_musicxml(ex: Exercise) -> str:
+    w = _Writer(ex)
+    measures = [w.measure(n, bar, n == len(ex.bars)) for n, bar in enumerate(ex.bars, 1)]
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" '
@@ -415,12 +477,6 @@ def exercises() -> list[Exercise]:
             [0, -2, -3, -4, -5, -4, -3, -2],
             "G5",
             15,
-            {
-                "asc_rh": [1, 2, 3, 4, 5],
-                "asc_lh": [5, 4, 3, 2, 1],
-                "desc_rh": [5, 4, 3, 2, 1],
-                "desc_lh": [1, 2, 3, 4, 5],
-            },
             ["C3"],
             ["C2"],
             1,
@@ -434,12 +490,6 @@ def exercises() -> list[Exercise]:
             [0, -3, -5, -4, -3, -4, -3, -2],
             "G5",
             14,
-            {
-                "asc_rh": [1, 2, 5, 4, 3, 4, 3, 2],
-                "asc_lh": [5, 3, 1, 2, 3, 2, 3, 4],
-                "desc_rh": [5, 2, 1, 2, 3, 2, 3, 4],
-                "desc_lh": [1, 3, 5, 4, 3, 4, 3, 2],
-            },
             ["C3"],
             ["C2"],
             2,
@@ -453,12 +503,6 @@ def exercises() -> list[Exercise]:
             [-2, 0, -3, -1, -2, -4, -3, -2],
             "G5",
             14,
-            {
-                "asc_rh": [3, 1, 4, 2, 5, 3, 4, 5],
-                "asc_lh": [3, 5, 2, 4, 1, 3, 2, 1],
-                "desc_rh": [3, 5, 2, 4, 3, 1, 3, 4],
-                "desc_lh": [3, 1, 4, 2, 3, 5, 3, 2],
-            },
             ["C3"],
             ["C2"],
             13,
@@ -472,15 +516,10 @@ def exercises() -> list[Exercise]:
             [0, -2, -5, -7, -5, -6, -5, -7],
             "E6",
             15,
-            {
-                "asc_rh": [1, 2, 4, 5, 4, 3, 4, 2],
-                "asc_lh": [5, 4, 2, 1, 2, 3, 2, 4],
-                "desc_rh": [5, 4, 2, 1, 3, 2, 3, 1],
-                "desc_lh": [1, 2, 4, 5, 3, 4, 3, 5],
-            },
             ["C3", "E3", "C4"],
             ["C2"],
             20,
+            final_rh_staff=2,
         ),
     ]
     return out + advanced()
@@ -503,6 +542,8 @@ def main() -> None:
                 "file": name,
                 "measures": len(ex.bars),
                 "page": ex.pages,
+                "heading": ex.heading,
+                "notes": ex.notes,
             }
         )
         print("wrote", name, len(ex.bars), "bars")
